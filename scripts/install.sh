@@ -24,7 +24,7 @@ echo "==> Installing system packages..."
 apt-get install -y --no-install-recommends \
   curl \
   cage \
-  chromium-browser \
+  chromium \
   fonts-noto-color-emoji
 
 # ── 2. Node.js LTS (NodeSource) ───────────────────────────────────────────────
@@ -130,7 +130,7 @@ done
 
 # Launch inside cage (single-app Wayland compositor); restart on crash
 while true; do
-  cage -- chromium-browser \
+  cage -- chromium \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \
