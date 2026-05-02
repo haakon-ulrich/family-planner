@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "ms-vscode-remote.remote-wsl",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "qwtel.sqlite-viewer",
+    "humao.rest-client",
+    "vitest.explorer",
+    "yoavbls.pretty-ts-errors"
+  ]
+}

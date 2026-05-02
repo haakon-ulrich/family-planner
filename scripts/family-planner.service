@@ -1,0 +1,26 @@
+[Unit]
+Description=Family Planner backend
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=family-planner
+Group=family-planner
+WorkingDirectory=/opt/family-planner/apps/server
+EnvironmentFile=/etc/family-planner/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=family-planner
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/family-planner
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+{
+  "name": "@family-planner/shared",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.1"
+  }
+}

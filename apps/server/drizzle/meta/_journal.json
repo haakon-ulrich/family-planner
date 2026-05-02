@@ -1,0 +1,55 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1777675239675,
+      "tag": "0000_cultured_squadron_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1777705747520,
+      "tag": "0001_purple_captain_america",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1777718167951,
+      "tag": "0002_abnormal_franklin_storm",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1777734182769,
+      "tag": "0003_spooky_monster_badoon",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1777734356002,
+      "tag": "0004_vengeful_ghost_rider",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1777735826425,
+      "tag": "0005_true_the_liberteens",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1777737786669,
+      "tag": "0006_cute_azazel",
+      "breakpoints": true
+    }
+  ]
+}
