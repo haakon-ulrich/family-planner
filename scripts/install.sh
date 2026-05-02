@@ -23,7 +23,7 @@ apt-get update -qq
 echo "==> Installing system packages..."
 apt-get install -y --no-install-recommends \
   curl \
-  cage \
+  sway \
   chromium \
   fonts-noto-color-emoji
 
@@ -128,21 +128,38 @@ until curl -sf http://localhost:3000/api/health >/dev/null 2>&1; do
   sleep 2
 done
 
-# Launch inside cage (single-app Wayland compositor); restart on crash
-while true; do
-  cage -- chromium \
-    --kiosk \
+# Launch sway (Wayland compositor); hides cursor at compositor level
+exec sway
+PROFILE_EOF
+
+mkdir -p "/home/$KIOSK_USER/.config/sway"
+cat > "/home/$KIOSK_USER/.config/sway/config" << 'SWAY_EOF'
+# Minimal kiosk compositor config
+output * bg #000000 solid_color
+seat * hide_cursor 0
+focus_follows_mouse no
+
+bar {
+  mode invisible
+}
+
+# Launch Chromium; restart automatically on crash
+exec bash -c 'while true; do \
+  chromium \
     --ozone-platform=wayland \
+    --kiosk \
     --noerrdialogs \
     --disable-infobars \
     --disable-session-crashed-bubble \
     --disable-features=Translate,TranslateUI \
     --check-for-update-interval=31536000 \
     --no-first-run \
-    --app=http://localhost:3000/
-  sleep 2
-done
-PROFILE_EOF
+    --app=http://localhost:3000/; \
+  sleep 2; \
+done'
+SWAY_EOF
+
+chown -R "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER/.config"
 
 chown "$KIOSK_USER:$KIOSK_USER" "/home/$KIOSK_USER/.bash_profile"
 systemctl daemon-reload

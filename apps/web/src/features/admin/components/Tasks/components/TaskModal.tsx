@@ -13,14 +13,14 @@ import StepEditor, { type StepField } from './StepEditor';
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 
 interface TaskFormState {
-  memberId: string;       // '' = household / unassigned
+  memberId: string; // '' = household / unassigned
   title: string;
   bucket: Bucket;
   kind: 'single' | 'multi';
   iconValue: string;
-  dueByTime: string;      // '' = none
+  dueByTime: string; // '' = none
   startDate: string;
-  endDate: string;        // '' = none
+  endDate: string; // '' = none
   carryOverIfIncomplete: boolean;
   postponable: boolean;
   active: boolean;
@@ -78,25 +78,42 @@ const formFromTask = (task: Task): TaskFormState => {
     active: task.active,
     steps: task.steps?.map((s) => ({ tempId: s.id, iconValue: s.iconValue })) ?? [],
     recurrenceKind: task.recurrenceKind,
-    weekdays: cfg.kind === 'weekdays' ? (cfg.days as Weekday[]) : ['mon', 'tue', 'wed', 'thu', 'fri'],
+    weekdays:
+      cfg.kind === 'weekdays' ? (cfg.days as Weekday[]) : ['mon', 'tue', 'wed', 'thu', 'fri'],
     everyNDays: cfg.kind === 'every_n_days' ? cfg.n : 2,
     monthlyType: cfg.kind === 'monthly' ? cfg.variant.type : 'day_of_month',
     monthlyDay: cfg.kind === 'monthly' && cfg.variant.type === 'day_of_month' ? cfg.variant.day : 1,
     monthlyNth: cfg.kind === 'monthly' && cfg.variant.type === 'nth_weekday' ? cfg.variant.n : 1,
-    monthlyWeekday: cfg.kind === 'monthly' && cfg.variant.type === 'nth_weekday' ? (cfg.variant.weekday as Weekday) : 'mon',
+    monthlyWeekday:
+      cfg.kind === 'monthly' && cfg.variant.type === 'nth_weekday'
+        ? (cfg.variant.weekday as Weekday)
+        : 'mon',
   };
 };
 
 const buildPayload = (form: TaskFormState): CreateTask => {
   const recurrenceConfig = (() => {
     switch (form.recurrenceKind) {
-      case 'none': return { kind: 'none' as const };
-      case 'weekdays': return { kind: 'weekdays' as const, days: form.weekdays };
-      case 'every_n_days': return { kind: 'every_n_days' as const, n: form.everyNDays };
+      case 'none':
+        return { kind: 'none' as const };
+      case 'weekdays':
+        return { kind: 'weekdays' as const, days: form.weekdays };
+      case 'every_n_days':
+        return { kind: 'every_n_days' as const, n: form.everyNDays };
       case 'monthly':
         return form.monthlyType === 'day_of_month'
-          ? { kind: 'monthly' as const, variant: { type: 'day_of_month' as const, day: form.monthlyDay } }
-          : { kind: 'monthly' as const, variant: { type: 'nth_weekday' as const, n: form.monthlyNth, weekday: form.monthlyWeekday } };
+          ? {
+              kind: 'monthly' as const,
+              variant: { type: 'day_of_month' as const, day: form.monthlyDay },
+            }
+          : {
+              kind: 'monthly' as const,
+              variant: {
+                type: 'nth_weekday' as const,
+                n: form.monthlyNth,
+                weekday: form.monthlyWeekday,
+              },
+            };
     }
   })();
 
@@ -114,9 +131,10 @@ const buildPayload = (form: TaskFormState): CreateTask => {
     carryOverIfIncomplete: form.carryOverIfIncomplete,
     postponable: form.postponable,
     active: form.active,
-    steps: form.kind === 'multi'
-      ? form.steps.map((s, i) => ({ iconValue: s.iconValue, sortOrder: i }))
-      : undefined,
+    steps:
+      form.kind === 'multi'
+        ? form.steps.map((s, i) => ({ iconValue: s.iconValue, sortOrder: i }))
+        : undefined,
   };
 };
 
@@ -124,7 +142,8 @@ const buildPayload = (form: TaskFormState): CreateTask => {
 // Sub-component pieces
 // ---------------------------------------------------------------------------
 
-const inputCls = 'w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors';
+const inputCls =
+  'w-full bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 transition-colors';
 const labelCls = 'block text-sm font-medium text-slate-300 mb-1.5';
 const sectionCls = 'space-y-1.5';
 
@@ -156,6 +175,15 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
   useEffect(() => {
     setForm(task ? formFromTask(task) : defaultForm());
   }, [task]);
+
+  useEffect(() => {
+    setForm((form) => {
+      if (!form.memberId && members.length > 0) {
+        return { ...form, memberId: members[0].id };
+      }
+      return form;
+    });
+  }, [members]);
 
   const set = <K extends keyof TaskFormState>(key: K, value: TaskFormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -191,7 +219,10 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
           <h2 className="text-base font-semibold text-white">
             {task ? 'Aufgabe bearbeiten' : 'Aufgabe hinzufügen'}
           </h2>
-          <button className="p-1 rounded text-slate-400 hover:text-white transition-colors" onClick={onClose}>
+          <button
+            className="p-1 rounded text-slate-400 hover:text-white transition-colors"
+            onClick={onClose}
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -199,7 +230,6 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
         {/* Scrollable form body */}
         <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
           <div className="p-5 space-y-5">
-
             {/* Title */}
             <div className={sectionCls}>
               <label className={labelCls}>Titel</label>
@@ -223,7 +253,9 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
                   className={inputCls}
                 >
                   {members.map((m) => (
-                    <option key={m.id} value={m.id}>{m.name}</option>
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -303,7 +335,9 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
                 />
               </div>
               <div className={sectionCls}>
-                <label className={labelCls}>Enddatum <span className="text-slate-500 font-normal">(optional)</span></label>
+                <label className={labelCls}>
+                  Enddatum <span className="text-slate-500 font-normal">(optional)</span>
+                </label>
                 <input
                   type="date"
                   value={form.endDate}
@@ -315,7 +349,9 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
 
             {/* Due by time */}
             <div className={sectionCls}>
-              <label className={labelCls}>Fälligkeit <span className="text-slate-500 font-normal">(optional)</span></label>
+              <label className={labelCls}>
+                Fälligkeit <span className="text-slate-500 font-normal">(optional)</span>
+              </label>
               <input
                 type="time"
                 value={form.dueByTime}
@@ -333,7 +369,9 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
                   onChange={(e) => set('carryOverIfIncomplete', e.target.checked)}
                   className="w-4 h-4 rounded accent-indigo-500"
                 />
-                <span className="text-sm text-slate-300">Unerledigte Aufgabe auf nächsten Tag übertragen</span>
+                <span className="text-sm text-slate-300">
+                  Unerledigte Aufgabe auf nächsten Tag übertragen
+                </span>
               </label>
 
               <label className="flex items-center gap-3 cursor-pointer select-none">
@@ -343,7 +381,9 @@ const TaskModal = ({ task, onClose, onSave, isSaving }: TaskModalProps) => {
                   onChange={(e) => set('postponable', e.target.checked)}
                   className="w-4 h-4 rounded accent-indigo-500"
                 />
-                <span className="text-sm text-slate-300">Aufgabe kann auf den nächsten Tag verschoben werden</span>
+                <span className="text-sm text-slate-300">
+                  Aufgabe kann auf den nächsten Tag verschoben werden
+                </span>
               </label>
 
               {task && (
