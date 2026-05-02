@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Kiosk: no mouse cursor on touch display — class set by main.tsx when VITE_KIOSK=true */
+.kiosk * {
+  cursor: none !important;
+}
+
 /* Scrollbar — matches slate-900 background */
 ::-webkit-scrollbar {
   width: 6px;
@@ -19,4 +24,43 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: #334155 transparent;
+}
+
+/* Virtual keyboard dark theme */
+.kiosk-keyboard {
+  background: transparent;
+  padding: 0;
+}
+.kiosk-keyboard .hg-row {
+  margin-bottom: 6px;
+}
+.kiosk-keyboard .hg-button {
+  height: 52px;
+  background: #334155;
+  color: #f1f5f9;
+  border-bottom: 2px solid #1e293b;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  box-shadow: none;
+}
+.kiosk-keyboard .hg-button:active {
+  background: #4f46e5;
+  border-bottom-color: #3730a3;
+}
+.kiosk-keyboard .hg-button[data-skbtn="{done}"] {
+  background: #4f46e5;
+  border-bottom-color: #3730a3;
+  font-size: 0.9rem;
+}
+.kiosk-keyboard .hg-button[data-skbtn="{done}"]:active {
+  background: #3730a3;
+}
+.kiosk-keyboard .hg-button[data-skbtn="{bksp}"],
+.kiosk-keyboard .hg-button[data-skbtn="{shift}"] {
+  background: #475569;
+  border-bottom-color: #1e293b;
+}
+.kiosk-keyboard .hg-button[data-skbtn="{space}"] {
+  flex-grow: 4;
 }

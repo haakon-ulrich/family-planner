@@ -3,6 +3,8 @@ import { Dashboard } from '@web/features/dashboard'
 import { Admin, Family, Tasks, System } from '@web/features/admin'
 import useSseEvents from '@web/hooks/useSseEvents'
 import useQuietHours from '@web/hooks/useQuietHours'
+import { useKioskKeyboard } from '@web/hooks/useKioskKeyboard'
+import { VirtualKeyboard } from '@web/ui/VirtualKeyboard'
 
 const router = createBrowserRouter([
   {
@@ -24,7 +26,19 @@ const router = createBrowserRouter([
 const AppShell = () => {
   useSseEvents()
   useQuietHours()
-  return <RouterProvider router={router} />
+  const { visible, isNumeric, onChange, dismiss, keyboardRef } = useKioskKeyboard()
+  return (
+    <>
+      <RouterProvider router={router} />
+      <VirtualKeyboard
+        visible={visible}
+        isNumeric={isNumeric}
+        onChange={onChange}
+        onDismiss={dismiss}
+        keyboardRef={keyboardRef}
+      />
+    </>
+  )
 }
 
 const App = () => <AppShell />
