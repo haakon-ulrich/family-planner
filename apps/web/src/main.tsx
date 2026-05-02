@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
 
-if (import.meta.env.VITE_KIOSK === 'true') {
+if (import.meta.env.PROD && window.location.hostname === 'localhost') {
   document.documentElement.classList.add('kiosk')
 }
 

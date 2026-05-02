@@ -132,6 +132,7 @@ done
 while true; do
   cage -- chromium \
     --kiosk \
+    --ozone-platform=wayland \
     --noerrdialogs \
     --disable-infobars \
     --disable-session-crashed-bubble \
