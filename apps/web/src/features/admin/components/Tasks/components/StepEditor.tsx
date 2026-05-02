@@ -11,9 +11,11 @@ interface StepEditorProps {
   onChange: (steps: StepField[]) => void;
 }
 
+const randomId = () => Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+
 const StepEditor = ({ steps, onChange }: StepEditorProps) => {
   const addStep = () =>
-    onChange([...steps, { tempId: crypto.randomUUID(), iconValue: '' }]);
+    onChange([...steps, { tempId: randomId(), iconValue: '' }]);
 
   const updateStep = (tempId: string, iconValue: string) =>
     onChange(steps.map((s) => (s.tempId === tempId ? { ...s, iconValue } : s)));
