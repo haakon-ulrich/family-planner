@@ -1,36 +1,40 @@
-import { ChevronLeft, ChevronRight, Flame, Settings, Volume2, VolumeX } from 'lucide-react'
-import { Link } from 'react-router-dom'
-import { parseISO } from 'date-fns'
-import { useHouseholdStreak } from '@web/features/streaks'
-import { useDashboardStore } from '@web/features/dashboard/store'
+import { ChevronLeft, ChevronRight, Flame, Settings, Volume2, VolumeX } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { parseISO } from 'date-fns';
+import { useHouseholdStreak } from '@web/features/streaks';
+import { useDashboardStore } from '@web/features/dashboard/store';
+import Clock from './components/Clock';
 
 interface DashboardHeaderProps {
-  date: string
-  onPrev: () => void
-  onNext: () => void
-  onToday: () => void
+  date: string;
+  onPrev: () => void;
+  onNext: () => void;
+  onToday: () => void;
 }
 
-const todayString = () => new Date().toLocaleDateString('sv')
+const todayString = () => new Date().toLocaleDateString('sv');
 
 const formatDate = (date: string): string =>
-  parseISO(date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' })
+  parseISO(date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long' });
 
 const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps) => {
-  const { data: householdStreak } = useHouseholdStreak()
-  const streak = householdStreak?.currentStreak ?? 0
-  const isToday = date === todayString()
-  const isMuted = useDashboardStore((s) => s.isMuted)
-  const toggleMuted = useDashboardStore((s) => s.toggleMuted)
+  const { data: householdStreak } = useHouseholdStreak();
+  const streak = householdStreak?.currentStreak ?? 0;
+  const isToday = date === todayString();
+  const isMuted = useDashboardStore((s) => s.isMuted);
+  const toggleMuted = useDashboardStore((s) => s.toggleMuted);
 
   return (
     <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-3 bg-slate-800 border-b border-slate-700/60">
-      <button
-        onClick={onPrev}
-        className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors shrink-0"
-      >
-        <ChevronLeft className="w-6 h-6" />
-      </button>
+      <div className="flex items-center gap-4 shrink-0">
+        <Clock />
+        <button
+          onClick={onPrev}
+          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+      </div>
 
       <div className="flex flex-col sm:flex-row items-center sm:gap-8 gap-0.5 min-w-0">
         <button
@@ -48,7 +52,7 @@ const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps
         )}
       </div>
 
-      <div className="flex items-center gap-1 shrink-0">
+      <div className="flex items-center gap-4 shrink-0">
         <button
           onClick={onNext}
           className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
@@ -60,9 +64,11 @@ const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps
           className="p-2 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer"
           title={isMuted ? 'Ton einschalten' : 'Ton ausschalten'}
         >
-          {isMuted
-            ? <VolumeX className="w-5 h-5 text-slate-500" />
-            : <Volume2 className="w-5 h-5 text-slate-400 hover:text-white" />}
+          {isMuted ? (
+            <VolumeX className="w-5 h-5 text-slate-500" />
+          ) : (
+            <Volume2 className="w-5 h-5 text-slate-400 hover:text-white" />
+          )}
         </button>
         <Link
           to="/admin"
@@ -72,7 +78,7 @@ const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps
         </Link>
       </div>
     </header>
-  )
-}
+  );
+};
 
-export default DashboardHeader
+export default DashboardHeader;

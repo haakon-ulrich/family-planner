@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
+import { isKioskMode } from '@web/lib/kioskMode'
 
-if (import.meta.env.PROD && window.location.hostname === 'localhost') {
+if (isKioskMode) {
   document.documentElement.classList.add('kiosk')
 }
 

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, gte, lte, or } from 'drizzle-orm';
+import { and, eq, inArray, isNull, isNotNull, gte, lte, or } from 'drizzle-orm';
 import { db } from '@server/db/index';
 import {
   tasks,
@@ -21,10 +21,19 @@ const isSingleTaskCompleted = (taskId: string, date: string): boolean => {
     .from(taskInstances)
     .where(and(eq(taskInstances.taskId, taskId), eq(taskInstances.date, date)))
     .get();
-  return row?.status === 'completed';
+  // skipped = explicitly postponed by the user; counts as satisfied for the original day
+  return row?.status === 'completed' || row?.status === 'skipped';
 };
 
 const isMultiTaskCompleted = (taskId: string, date: string): boolean => {
+  const instance = db
+    .select({ status: taskInstances.status })
+    .from(taskInstances)
+    .where(and(eq(taskInstances.taskId, taskId), eq(taskInstances.date, date)))
+    .get();
+
+  if (instance?.status === 'skipped') return true;
+
   const steps = db
     .select({ id: taskSteps.id })
     .from(taskSteps)
@@ -78,8 +87,32 @@ export const updateStreakForMember = (memberId: string, date: string): void => {
     .all()
     .filter((t) => isTaskActiveOnDate(t, date));
 
+  // Also include tasks postponed TO this date that aren't normally scheduled here.
+  // These have a taskInstances row with postponedFrom set and date = this date.
+  const applicableIds = new Set(applicable.map((t) => t.id));
+  const postponedRows = db
+    .select({ taskId: taskInstances.taskId })
+    .from(taskInstances)
+    .innerJoin(tasks, eq(taskInstances.taskId, tasks.id))
+    .where(
+      and(
+        eq(taskInstances.date, date),
+        isNotNull(taskInstances.postponedFrom),
+        eq(tasks.memberId, memberId),
+        eq(tasks.active, 1),
+      ),
+    )
+    .all();
+
+  const extraIds = postponedRows.map((r) => r.taskId).filter((id) => !applicableIds.has(id));
+  const postponedTasks =
+    extraIds.length > 0 ? db.select().from(tasks).where(inArray(tasks.id, extraIds)).all() : [];
+
+  const allApplicable = [...applicable, ...postponedTasks];
+
   // A day with no applicable tasks counts as completed — no tasks means nothing to fail.
-  const allDone = applicable.length === 0 || applicable.every((t) => isTaskCompletedOnDate(t, date));
+  const allDone =
+    allApplicable.length === 0 || allApplicable.every((t) => isTaskCompletedOnDate(t, date));
 
   db.insert(streaks)
     .values({ memberId, date, allCompleted: allDone ? 1 : 0 })

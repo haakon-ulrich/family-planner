@@ -51,7 +51,7 @@ const MultiStepTile = ({ id, title, steps, color, dueByTime, postponable }: Mult
           ))}
         </div>
         <span
-          className={`text-xs font-medium mt-1.5 text-center px-1 leading-tight transition-colors duration-200 ${
+          className={`font-medium mt-1.5 text-center px-1 leading-tight transition-colors duration-200 ${
             allDone ? 'text-slate-500' : 'text-slate-300'
           }`}
         >

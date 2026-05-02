@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { isKioskMode } from '@web/lib/kioskMode';
 
 type KeyboardHandle = { setInput: (value: string) => void };
 
@@ -21,6 +22,8 @@ export const useKioskKeyboard = () => {
   const keyboardRef = useRef<KeyboardHandle>(null);
 
   useEffect(() => {
+    if (!isKioskMode) return;
+
     const onFocusIn = (e: FocusEvent) => {
       const target = e.target as HTMLInputElement;
       if (target.tagName !== 'INPUT') return;
