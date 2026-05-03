@@ -19,7 +19,7 @@ SyslogIdentifier=family-planner-vacuum
 NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=/var/lib/family-planner/vacuum
-ProtectHome=yes
+ProtectHome=read-only
 PrivateTmp=yes
 
 [Install]

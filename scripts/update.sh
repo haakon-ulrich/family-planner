@@ -21,6 +21,7 @@ npm run build
 echo "==> Syncing vacuum sidecar dependencies..."
 cd "$APP_DIR/services/vacuum"
 uv sync
+chmod -R a+rX /root/.local/share/uv/python/
 cd "$APP_DIR"
 
 echo "==> Restarting services..."

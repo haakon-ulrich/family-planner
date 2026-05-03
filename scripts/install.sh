@@ -116,6 +116,7 @@ fi
 echo "==> Setting up vacuum sidecar Python venv..."
 cd "$APP_DIR/services/vacuum"
 uv sync
+chmod -R a+rX /root/.local/share/uv/python/
 cd "$APP_DIR"
 
 # ── 12. Vacuum data directory and env ─────────────────────────────────────────
