@@ -3,10 +3,9 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
 from models import HealthData, HealthResponse
 from routers.status import router as status_router
-from services import vacuum_service
+from services.vacuum_service import start, stop
 from settings import settings
 
 logging.basicConfig(
@@ -19,9 +18,9 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Vacuum sidecar starting on port %d", settings.sidecar_port)
-    await vacuum_service.start()
+    await start()
     yield
-    await vacuum_service.stop()
+    await stop()
     logger.info("Vacuum sidecar stopped")
 
 

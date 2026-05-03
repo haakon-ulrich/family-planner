@@ -15,10 +15,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from roborock import UserData
+from roborock.data import UserData
 from roborock.exceptions import RoborockException
 from roborock.web_api import RoborockApiClient
-
 from services.auth_service import save_cache
 from settings import settings
 

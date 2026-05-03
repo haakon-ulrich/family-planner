@@ -14,4 +14,4 @@ class Settings(BaseSettings):
     vacuum_data_dir: Path = Path("./data")
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[unused-ignore]

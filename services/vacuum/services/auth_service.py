@@ -2,9 +2,8 @@ import json
 import logging
 from typing import cast
 
-from roborock import UserData
+from roborock.data import UserData
 from roborock.devices.device_manager import UserParams
-
 from settings import settings
 
 logger = logging.getLogger(__name__)
@@ -22,7 +21,7 @@ def _load_cache() -> UserData | None:
         return None
     try:
         raw = json.loads(_CACHE_PATH.read_text(encoding="utf-8"))
-        return cast(UserData, UserData.from_dict(raw))
+        return cast(UserData, UserData.from_dict(raw))  # type: ignore[unused-ignore]
     except Exception:
         logger.warning("Auth cache unreadable or corrupt")
         return None
