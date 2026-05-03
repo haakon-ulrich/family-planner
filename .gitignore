@@ -53,3 +53,9 @@ drizzle/.snapshot/
 
 # Google API credentials
 service_account.json
+
+# Python 
+.venv/
+__pycache__/
+*.pyc
+.mypy_cache/

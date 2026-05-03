@@ -104,7 +104,40 @@ systemctl enable family-planner
 systemctl restart family-planner
 echo "==> family-planner.service started"
 
-# ── 10. Kiosk autologin on tty1 ──────────────────────────────────────────────
+# ── 10. uv (Python package manager for the vacuum sidecar) ───────────────────
+if ! command -v uv &>/dev/null; then
+  echo "==> Installing uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR=/usr/local sh
+else
+  echo "==> uv $(uv --version) already installed"
+fi
+
+# ── 11. Vacuum sidecar Python venv ────────────────────────────────────────────
+echo "==> Setting up vacuum sidecar Python venv..."
+cd "$APP_DIR/services/vacuum"
+uv sync
+cd "$APP_DIR"
+
+# ── 12. Vacuum data directory and env ─────────────────────────────────────────
+VACUUM_DATA_DIR=/var/lib/family-planner/vacuum
+echo "==> Creating vacuum data directory: $VACUUM_DATA_DIR"
+mkdir -p "$VACUUM_DATA_DIR"
+chown "$SERVICE_USER:$SERVICE_USER" "$VACUUM_DATA_DIR"
+chmod 750 "$VACUUM_DATA_DIR"
+
+if ! grep -q "^VACUUM_DATA_DIR=" "$ENV_FILE" 2>/dev/null; then
+  echo "VACUUM_DATA_DIR=$VACUUM_DATA_DIR" >> "$ENV_FILE"
+fi
+
+# ── 13. Vacuum sidecar systemd service ────────────────────────────────────────
+echo "==> Installing vacuum sidecar service..."
+cp "$APP_DIR/scripts/family-planner-vacuum.service" /etc/systemd/system/family-planner-vacuum.service
+systemctl daemon-reload
+systemctl enable family-planner-vacuum
+# Service is NOT started here — Roborock auth setup must run first (see Next steps)
+echo "==> family-planner-vacuum.service installed (not started)"
+
+# ── 14. Kiosk autologin on tty1 ──────────────────────────────────────────────
 echo "==> Configuring kiosk autologin..."
 mkdir -p /etc/systemd/system/getty@tty1.service.d
 cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
@@ -170,13 +203,25 @@ echo "==> Installation complete!"
 echo ""
 echo "  Next steps:"
 if [[ ! -f "$ENV_FILE" ]] || grep -q '^SECRET_KEY=$' "$ENV_FILE" 2>/dev/null; then
-  echo "  1. Fill in required values: sudo nano $ENV_FILE"
-  echo "  2. Restart the service:     sudo systemctl restart family-planner"
-  echo "  3. Reboot for kiosk:        sudo reboot"
+  echo "  1. Fill in required values:  sudo nano $ENV_FILE"
+  echo "     (SECRET_KEY, GOOGLE_*, WEATHER_*, ROBOROCK_USERNAME, ROBOROCK_PASSWORD)"
+  echo "  2. Restart the Node service: sudo systemctl restart family-planner"
 else
-  echo "  1. Reboot to start the kiosk display: sudo reboot"
+  echo "  1. Env file already configured."
 fi
 echo ""
+echo "  3. Run the one-time Roborock auth setup (interactive — enter email code):"
+echo "     sudo -u $SERVICE_USER bash -c '"
+echo "       set -a; source $ENV_FILE; set +a"
+echo "       cd /opt/family-planner/services/vacuum"
+echo "       .venv/bin/python scripts/setup_auth.py"
+echo "     '"
+echo ""
+echo "  4. Start the vacuum sidecar:  sudo systemctl start family-planner-vacuum"
+echo "  5. Reboot for kiosk:          sudo reboot"
+echo ""
 echo "  Useful commands:"
-echo "    sudo journalctl -u family-planner -f   # live backend logs"
-echo "    sudo systemctl status family-planner   # service status"
+echo "    sudo journalctl -u family-planner -f          # backend logs"
+echo "    sudo journalctl -u family-planner-vacuum -f   # vacuum sidecar logs"
+echo "    sudo systemctl status family-planner          # service status"
+echo "    sudo systemctl status family-planner-vacuum   # sidecar status"

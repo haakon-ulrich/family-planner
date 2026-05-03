@@ -2,6 +2,7 @@ import { Calendar, RefreshCw } from 'lucide-react'
 import { addDays, parseISO } from 'date-fns'
 import CalendarSection from './components/CalendarSection'
 import WeatherSection from './components/WeatherSection'
+import VacuumWidget from './components/VacuumWidget'
 import { useDashboardDate } from '../../DashboardDate'
 import { useCalendarEvents } from '@web/features/calendar'
 import { useMembers } from '@web/features/members'
@@ -113,6 +114,8 @@ const CalendarColumn = () => {
           />
         ))}
       </div>
+
+      <VacuumWidget />
     </div>
   )
 }

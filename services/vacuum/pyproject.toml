@@ -1,0 +1,30 @@
+[project]
+name = "vacuum"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.136.1",
+    "pydantic-settings>=2.14.0",
+    "python-roborock>=5.10.0",
+    "uvicorn[standard]>=0.46.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.20.2",
+]
+
+[tool.mypy]
+strict = true
+python_version = "3.14"
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = [
+    "roborock.*",
+    "vacuum_map_parser_roborock.*",
+    "vacuum_map_parser_base.*",
+]
+ignore_missing_imports = true

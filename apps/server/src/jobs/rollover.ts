@@ -133,13 +133,14 @@ const catchUp = (): void => {
 export const startRolloverJob = (): void => {
   catchUp();
 
-  // Fire at 00:00 server local time; TZ env var controls the server's local time
-  cron.schedule('0 0 * * *', () => {
+  // Fire at 03:00 server local time; TZ env var controls the server's local time.
+  // 3am gives overnight tasks a buffer before the day is considered closed.
+  cron.schedule('0 3 * * *', () => {
     const tz = getTimezone();
     const completedDate = localDate(tz, -1); // yesterday (the day that just ended)
     const newDate = localDate(tz, 0);        // today (the new day)
     performRollover(completedDate, newDate);
   });
 
-  log.info('Rollover job scheduled (daily at 00:00)');
+  log.info('Rollover job scheduled (daily at 03:00)');
 };

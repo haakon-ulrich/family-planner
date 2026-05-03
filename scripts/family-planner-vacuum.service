@@ -1,0 +1,26 @@
+[Unit]
+Description=Family Planner vacuum sidecar
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=family-planner
+Group=family-planner
+WorkingDirectory=/opt/family-planner/services/vacuum
+EnvironmentFile=/etc/family-planner/.env
+ExecStart=/opt/family-planner/services/vacuum/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=family-planner-vacuum
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/family-planner/vacuum
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

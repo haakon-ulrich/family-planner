@@ -114,7 +114,7 @@ The same SPA runs in Chromium on the Pi and in any browser on the LAN. Layout ad
 - A REST/JSON API for tasks, members, completions, settings.
 - An SSE endpoint (`/events`) that pushes real-time updates to all connected clients.
 - A static file handler for the built SPA.
-- Background workers (in-process): calendar poller, midnight rollover scheduler, daily backup job.
+- Background workers (in-process): calendar poller, 3am rollover scheduler, daily backup job.
 
 **Database.** A single SQLite file managed by Drizzle ORM. Stored on the SSD (or SD card) at a stable path (e.g. `/var/lib/family-planner/app.db`).
 
@@ -321,14 +321,14 @@ Carry-over is materialized at the daily rollover, not computed on read, so the d
 
 ### 7.2 Daily rollover
 
-A scheduled job runs at 00:00 local time:
+A scheduled job runs at 03:00 local time:
 
 1. For each member, evaluate yesterday's tasks: write `streaks` row (`all_completed = 1` iff every applicable task was completed).
 2. Write `household_streaks` row.
 3. Process carry-overs: for each yesterday task with `carry_over_if_incomplete = 1` whose instance is `pending`, create today's `pending` instance and mark yesterday's as `carried_over`.
 4. Broadcast an SSE `day-rolled-over` event so connected clients refresh.
 
-If the Pi was off at midnight, the job catches up on next start by walking forward day-by-day from the last processed date.
+If the Pi was off at 03:00, the job catches up on next start by walking forward day-by-day from the last processed date.
 
 ### 7.3 Tick-off flow
 

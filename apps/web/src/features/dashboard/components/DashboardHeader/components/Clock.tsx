@@ -16,7 +16,9 @@ const Clock = () => {
     return () => clearInterval(id);
   }, []);
 
-  return <span className="text-slate-400 text-3xl font-mono tabular-nums select-none">{time}</span>;
+  return (
+    <span className="text-slate-400 md:text-3xl font-mono tabular-nums select-none">{time}</span>
+  );
 };
 
 export default Clock;

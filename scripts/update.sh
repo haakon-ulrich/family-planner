@@ -18,8 +18,14 @@ npm ci
 echo "==> Building..."
 npm run build
 
-echo "==> Restarting service..."
+echo "==> Syncing vacuum sidecar dependencies..."
+cd "$APP_DIR/services/vacuum"
+uv sync
+cd "$APP_DIR"
+
+echo "==> Restarting services..."
 systemctl restart family-planner
-systemctl status family-planner --no-pager
+systemctl restart family-planner-vacuum
+systemctl status family-planner family-planner-vacuum --no-pager
 
 echo "==> Done."
