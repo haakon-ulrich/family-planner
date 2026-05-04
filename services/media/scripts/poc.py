@@ -3,7 +3,7 @@
 # dependencies = [
 #   "ytmusicapi>=1.8",
 #   "pychromecast>=14.0",
-#   "casttube>=0.2.0",
+#   "yt-dlp>=2025.1.1",
 #   "requests>=2.32",
 # ]
 # ///
@@ -158,118 +158,78 @@ def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[ty
     return chromecasts[0]
 
 
-def _probe_http(host: str) -> None:
-    """Diagnostic: print raw responses from the Cast device HTTP interface."""
-    import requests
+def get_audio_stream_url(video_id: str, cookies_file: str | None = None) -> tuple[str, str] | None:
+    """Extract a direct audio stream URL from a YouTube video ID using yt-dlp.
 
-    paths = [
-        "/apps/YouTube",
-        "/apps/YouTubeMusic",
-        "/setup/eureka_info",
-        "/",
-    ]
-    print(f"\n  [diag] probing http://{host}:8008 …")
-    for path in paths:
-        url = f"http://{host}:8008{path}"
-        try:
-            resp = requests.get(url, timeout=3)
-            preview = resp.text[:300].replace("\n", " ")
-            print(f"  [diag] GET {path} → {resp.status_code}  body: {preview!r}")
-        except requests.RequestException as exc:
-            print(f"  [diag] GET {path} → ERROR: {exc}")
-
-
-def _get_screen_id(host: str, launch_wait: int = 10) -> str | None:
-    """Get the YouTube receiver's screenId from the Cast device HTTP API.
-
-    The device exposes an HTTP endpoint at :8008/apps/YouTube that returns XML
-    describing the running YouTube cast receiver app. Once the app is running,
-    the XML contains a <screenId> element (or it's embedded as JSON in
-    <additionalData>). We try both formats and both /apps/YouTube and
-    /apps/YouTubeMusic paths.
+    Returns (url, content_type) or None on failure.
+    For YouTube Premium content pass a Netscape-format cookies file exported
+    from your browser (yt-dlp --cookies flag).
     """
-    import re
-    import requests
+    import yt_dlp  # type: ignore[import-untyped]
 
-    paths = ["/apps/YouTube", "/apps/YouTubeMusic"]
-    deadline = time.monotonic() + launch_wait
-    while time.monotonic() < deadline:
-        for path in paths:
-            try:
-                resp = requests.get(f"http://{host}:8008{path}", timeout=3)
-                text = resp.text
-                # Format 1: <screenId>…</screenId>
-                m = re.search(r"<screenId>([^<]+)</screenId>", text)
-                if m:
-                    return m.group(1).strip()
-                # Format 2: JSON blob inside <additionalData>
-                m = re.search(r'"screenId"\s*:\s*"([^"]+)"', text)
-                if m:
-                    return m.group(1).strip()
-            except requests.RequestException:
-                pass
-        time.sleep(1)
-    return None
+    ydl_opts: dict = {
+        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        "quiet": True,
+        "no_warnings": True,
+    }
+    if cookies_file:
+        ydl_opts["cookiefile"] = cookies_file
+
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            if not info:
+                return None
+            stream_url: str = info["url"]
+            ext: str = info.get("ext", "m4a")
+            # Map extension to MIME type the Cast default receiver accepts
+            mime = {"m4a": "audio/mp4", "webm": "audio/webm", "mp3": "audio/mpeg"}.get(ext, "audio/mp4")
+            return stream_url, mime
+    except Exception as exc:
+        print(f"  yt-dlp error: {exc}")
+        return None
 
 
-def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> None:  # type: ignore[type-arg]
-    """Cast a YouTube video using the Lounge API (via casttube).
+def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None) -> None:  # type: ignore[type-arg]
+    """Cast a YouTube audio stream to a Cast device via the Default Media Receiver.
 
     Flow:
-      1. Connect via pychromecast and launch the YouTube receiver app.
-      2. Retrieve the receiver's screenId from the device's HTTP API (:8008).
-      3. Hand off to casttube which does the full Lounge API handshake and
-         sends the play command — the same path the YouTube mobile app uses.
-    """
-    try:
-        from pychromecast.controllers.youtube import YouTubeController
-        import casttube
-    except ImportError as exc:
-        print(f"Missing dependency: {exc}. Run: uv run poc.py")
-        return
+      1. Connect via pychromecast.
+      2. Use yt-dlp to extract a direct HTTPS audio stream URL from the video ID.
+      3. Cast the stream URL via the DefaultMediaReceiver — no YouTube receiver,
+         no lounge API, no screen ID needed. Works on Google Home Mini.
 
+    For YouTube Premium content (audio shows, YouTube Music) you need a cookies
+    file exported from a browser that is signed in with your Premium account:
+        uv run poc.py --video-id ID --cookies ~/yt-cookies.txt
+    Export from Chrome: use the 'Get cookies.txt LOCALLY' extension and save
+    for youtube.com / music.youtube.com.
+    """
     target = _pick_target(chromecasts, device_name)
-    host = target.cast_info.host
 
     print(f"\n{'─' * 60}")
-    print(f"Connecting to '{target.cast_info.friendly_name}' …")
+    print(f"Extracting audio stream for {video_id} via yt-dlp …")
+    result = get_audio_stream_url(video_id, cookies_file=cookies_file)
+    if not result:
+        print("  ERROR: yt-dlp could not extract a stream URL.")
+        print("  If this is Premium/Music content, retry with --cookies <file>.")
+        return
+    stream_url, mime = result
+    print(f"  Stream URL: {stream_url[:80]}…")
+    print(f"  MIME type:  {mime}")
+
+    print(f"\nConnecting to '{target.cast_info.friendly_name}' …")
     target.wait()
     print(f"  Connected. Current app: {target.app_display_name!r}")
 
-    # Launch the YouTube receiver if it isn't already open.
-    yt_ctrl = YouTubeController()
-    target.register_handler(yt_ctrl)
-    YOUTUBE_APP_ID = "233637DE"
-    if target.app_id != YOUTUBE_APP_ID:
-        print("  Launching YouTube receiver …")
-        yt_ctrl.launch()
-        time.sleep(4)
-    else:
-        print("  YouTube receiver already running.")
-
-    # Retrieve the screenId the receiver advertises over HTTP.
-    print(f"  Fetching screenId from http://{host}:8008 …")
-    screen_id = _get_screen_id(host, launch_wait=10)
-    if not screen_id:
-        print("  ERROR: could not get screenId. Raw HTTP diagnostic:")
-        _probe_http(host)
-        return
-    print(f"  screenId: {screen_id}")
-
-    # Use casttube (YouTube Lounge API) to actually queue the video.
-    # This is what the YouTube mobile app does when you hit the cast button.
-    print(f"  Sending play command via Lounge API: {video_id} …")
-    try:
-        session = casttube.YouTubeSession(screen_id)
-        session.play_video(video_id)
-        print("  Command sent. Video should start within a few seconds.")
-    except Exception as exc:
-        print(f"  Lounge API error: {exc}")
-        return
-
-    # Poll the standard media controller as a rough confirmation.
     mc = target.media_controller
-    deadline = time.monotonic() + 15
+    print(f"  Casting stream ({mime}) …")
+    mc.play_media(stream_url, mime)
+    mc.block_until_active(timeout=10)
+
+    # Poll for up to 20 s for the player to leave IDLE/BUFFERING.
+    deadline = time.monotonic() + 20
     last_state: str | None = None
     while time.monotonic() < deadline:
         time.sleep(1)
@@ -277,11 +237,14 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> Non
         state: str | None = mc.status.player_state  # type: ignore[assignment]
         if state != last_state:
             remaining = int(deadline - time.monotonic())
-            print(f"  [{remaining:2d}s left]  media state={state!r}")
+            print(f"  [{remaining:2d}s left]  state={state!r}  pos={mc.status.current_time:.0f}s")
             last_state = state
-        if state not in (None, "IDLE", "BUFFERING"):
+        if state == "PLAYING":
+            print("  Playing!")
             break
 
+    if last_state != "PLAYING":
+        print(f"  Final state: {last_state!r} — did not reach PLAYING within 20 s.")
     print("Done.")
 
 
@@ -299,6 +262,7 @@ def main() -> None:
     parser.add_argument("--video-id", metavar="ID", help="Skip search; cast this YouTube video ID directly")
     parser.add_argument("--no-cast", action="store_true", help="Browse and discover only; never cast")
     parser.add_argument("--timeout", type=int, default=8, help="mDNS discovery timeout in seconds (default: 8)")
+    parser.add_argument("--cookies", metavar="FILE", help="Netscape cookies file for YouTube Premium content")
     args = parser.parse_args()
 
     # Step 1: browse content
@@ -326,7 +290,7 @@ def main() -> None:
         print(f"\nReady to cast video {video_id!r} to a Cast device.")
         confirm = input("Proceed? [y/N] ").strip().lower()
         if confirm == "y":
-            cast_video(chromecasts, args.cast_name, video_id)
+            cast_video(chromecasts, args.cast_name, video_id, cookies_file=args.cookies)
         else:
             print("Skipped.")
     finally:
