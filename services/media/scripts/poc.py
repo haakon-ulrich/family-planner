@@ -179,12 +179,31 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> Non
     target.register_handler(yt_ctrl)
     yt_ctrl.play_video(video_id)
 
-    time.sleep(4)
+    # Poll up to 20 s for the media state to leave IDLE.
+    # YouTube receiver needs time to launch, authenticate, and buffer.
     mc = target.media_controller
-    mc.update_status()
-    time.sleep(1)
-    print(f"  Media state: {mc.status.player_state!r}")
+    deadline = time.monotonic() + 20
+    last_state = None
+    while time.monotonic() < deadline:
+        time.sleep(1)
+        mc.update_status()
+        state = mc.status.player_state
+        content = mc.status.content_id
+        if state != last_state:
+            print(f"  [{int(deadline - time.monotonic()):2d}s left]  state={state!r}  content_id={content!r}")
+            last_state = state
+        if state not in (None, "IDLE", "BUFFERING"):
+            break
+
+    print(f"\n  Final state: {mc.status.player_state!r}")
     print(f"  Content ID:  {mc.status.content_id!r}")
+    if mc.status.player_state in (None, "IDLE"):
+        print(
+            "\n  NOTE: stayed IDLE. Possible causes:\n"
+            "    1. Premium/Music content needs a linked Google session (auth issue)\n"
+            "    2. Video is region-locked or unavailable\n"
+            "    Try with a known-public video: --video-id dQw4w9WgXcQ"
+        )
     print("Done.")
 
 
