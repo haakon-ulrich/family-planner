@@ -158,33 +158,56 @@ def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[ty
     return chromecasts[0]
 
 
-def _get_screen_id(host: str, launch_wait: int = 6) -> str | None:
+def _probe_http(host: str) -> None:
+    """Diagnostic: print raw responses from the Cast device HTTP interface."""
+    import requests
+
+    paths = [
+        "/apps/YouTube",
+        "/apps/YouTubeMusic",
+        "/setup/eureka_info",
+        "/",
+    ]
+    print(f"\n  [diag] probing http://{host}:8008 …")
+    for path in paths:
+        url = f"http://{host}:8008{path}"
+        try:
+            resp = requests.get(url, timeout=3)
+            preview = resp.text[:300].replace("\n", " ")
+            print(f"  [diag] GET {path} → {resp.status_code}  body: {preview!r}")
+        except requests.RequestException as exc:
+            print(f"  [diag] GET {path} → ERROR: {exc}")
+
+
+def _get_screen_id(host: str, launch_wait: int = 10) -> str | None:
     """Get the YouTube receiver's screenId from the Cast device HTTP API.
 
     The device exposes an HTTP endpoint at :8008/apps/YouTube that returns XML
     describing the running YouTube cast receiver app. Once the app is running,
     the XML contains a <screenId> element (or it's embedded as JSON in
-    <additionalData>). We try both formats.
+    <additionalData>). We try both formats and both /apps/YouTube and
+    /apps/YouTubeMusic paths.
     """
     import re
     import requests
 
-    url = f"http://{host}:8008/apps/YouTube"
+    paths = ["/apps/YouTube", "/apps/YouTubeMusic"]
     deadline = time.monotonic() + launch_wait
     while time.monotonic() < deadline:
-        try:
-            resp = requests.get(url, timeout=3)
-            text = resp.text
-            # Format 1: <screenId>…</screenId>
-            m = re.search(r"<screenId>([^<]+)</screenId>", text)
-            if m:
-                return m.group(1).strip()
-            # Format 2: JSON blob inside <additionalData>
-            m = re.search(r'"screenId"\s*:\s*"([^"]+)"', text)
-            if m:
-                return m.group(1).strip()
-        except requests.RequestException:
-            pass
+        for path in paths:
+            try:
+                resp = requests.get(f"http://{host}:8008{path}", timeout=3)
+                text = resp.text
+                # Format 1: <screenId>…</screenId>
+                m = re.search(r"<screenId>([^<]+)</screenId>", text)
+                if m:
+                    return m.group(1).strip()
+                # Format 2: JSON blob inside <additionalData>
+                m = re.search(r'"screenId"\s*:\s*"([^"]+)"', text)
+                if m:
+                    return m.group(1).strip()
+            except requests.RequestException:
+                pass
         time.sleep(1)
     return None
 
@@ -225,13 +248,11 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> Non
         print("  YouTube receiver already running.")
 
     # Retrieve the screenId the receiver advertises over HTTP.
-    print(f"  Fetching screenId from http://{host}:8008/apps/YouTube …")
-    screen_id = _get_screen_id(host, launch_wait=8)
+    print(f"  Fetching screenId from http://{host}:8008 …")
+    screen_id = _get_screen_id(host, launch_wait=10)
     if not screen_id:
-        print(
-            "  ERROR: could not get screenId from device HTTP API.\n"
-            "  The YouTube app may not have fully started, or port 8008 is firewalled."
-        )
+        print("  ERROR: could not get screenId. Raw HTTP diagnostic:")
+        _probe_http(host)
         return
     print(f"  screenId: {screen_id}")
 
