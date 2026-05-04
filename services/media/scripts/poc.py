@@ -188,6 +188,12 @@ class _AudioProxy(BaseHTTPRequestHandler):
         except Exception as exc:
             self.send_error(502, str(exc))
 
+    def do_HEAD(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", self.mime)
+        self.send_header("Accept-Ranges", "bytes")
+        self.end_headers()
+
     def log_message(self, fmt: str, *args: object) -> None:
         print(f"  [proxy] {self.address_string()} {fmt % args}")
 
