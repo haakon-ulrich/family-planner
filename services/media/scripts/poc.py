@@ -224,12 +224,19 @@ def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[ty
     return chromecasts[0]
 
 
-def get_audio_stream_url(video_id: str, cookies_file: str | None = None) -> tuple[str, str] | None:
+def get_audio_stream_url(
+    video_id: str,
+    cookies_file: str | None = None,
+    use_oauth: bool = False,
+) -> tuple[str, str] | None:
     """Extract a direct audio stream URL from a YouTube video ID using yt-dlp.
 
     Returns (url, content_type) or None on failure.
-    For YouTube Premium content pass a Netscape-format cookies file exported
-    from your browser (yt-dlp --cookies flag).
+
+    Auth options (pick one):
+      use_oauth=True  — uses the cached OAuth2 token in ~/.cache/yt-dlp/.
+                        Run once to set up: uv run yt-dlp --username oauth2 --password '' <url>
+      cookies_file    — path to a Netscape-format cookies file from your browser.
     """
     import yt_dlp  # type: ignore[import-untyped]
 
@@ -238,7 +245,10 @@ def get_audio_stream_url(video_id: str, cookies_file: str | None = None) -> tupl
         "quiet": True,
         "no_warnings": True,
     }
-    if cookies_file:
+    if use_oauth:
+        ydl_opts["username"] = "oauth2"
+        ydl_opts["password"] = ""
+    elif cookies_file:
         ydl_opts["cookiefile"] = cookies_file
 
     url = f"https://www.youtube.com/watch?v={video_id}"
@@ -399,7 +409,7 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
     return False
 
 
-def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None) -> bool:  # type: ignore[type-arg]
+def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None, use_oauth: bool = False) -> bool:  # type: ignore[type-arg]
     """Attempt 2: yt-dlp stream extraction + local proxy + Default Media Receiver.
 
     Works for any content yt-dlp can access. NOT gapless for multi-track albums.
@@ -408,7 +418,7 @@ def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None) -> 
     print(f"\n{'─' * 60}")
     print("Approach 2: yt-dlp → local proxy → Default Media Receiver")
 
-    result = get_audio_stream_url(video_id, cookies_file=cookies_file)
+    result = get_audio_stream_url(video_id, cookies_file=cookies_file, use_oauth=use_oauth)
     if not result:
         print("  ERROR: yt-dlp could not extract a stream URL.")
         return False
@@ -454,14 +464,14 @@ def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None) -> 
     return False
 
 
-def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None) -> None:  # type: ignore[type-arg]
+def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None, use_oauth: bool = False) -> None:  # type: ignore[type-arg]
     target = _pick_target(chromecasts, device_name)
     print(f"Connecting to '{target.cast_info.friendly_name}' …")
     target.wait()
     print(f"  Connected. Current app: {target.app_display_name!r}")
 
     if not _try_mdx_cast(target, video_id):
-        _try_ytdlp_cast(target, video_id, cookies_file)
+        _try_ytdlp_cast(target, video_id, cookies_file, use_oauth=use_oauth)
 
     print("\nDone.")
 
@@ -481,6 +491,7 @@ def main() -> None:
     parser.add_argument("--no-cast", action="store_true", help="Browse and discover only; never cast")
     parser.add_argument("--timeout", type=int, default=8, help="mDNS discovery timeout in seconds (default: 8)")
     parser.add_argument("--cookies", metavar="FILE", help="Netscape cookies file for YouTube Premium content")
+    parser.add_argument("--oauth", action="store_true", help="Use yt-dlp OAuth2 token cache (~/.cache/yt-dlp/)")
     args = parser.parse_args()
 
     # Step 1: browse content
@@ -508,7 +519,7 @@ def main() -> None:
         print(f"\nReady to cast video {video_id!r} to a Cast device.")
         confirm = input("Proceed? [y/N] ").strip().lower()
         if confirm == "y":
-            cast_video(chromecasts, args.cast_name, video_id, cookies_file=args.cookies)
+            cast_video(chromecasts, args.cast_name, video_id, cookies_file=args.cookies, use_oauth=args.oauth)
         else:
             print("Skipped.")
     finally:
