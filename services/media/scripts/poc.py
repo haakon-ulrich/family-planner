@@ -4,6 +4,7 @@
 #   "ytmusicapi>=1.8",
 #   "pychromecast>=14.0",
 #   "yt-dlp>=2025.1.1",
+#   "casttube>=0.2.0",
 #   "requests>=2.32",
 # ]
 # ///
@@ -256,95 +257,158 @@ def get_audio_stream_url(video_id: str, cookies_file: str | None = None) -> tupl
         return None
 
 
-def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None) -> None:  # type: ignore[type-arg]
-    """Cast a YouTube audio stream to a Cast device via the Default Media Receiver.
+def _poll_media_state(mc: object, timeout: int = 20) -> str | None:  # type: ignore[type-arg]
+    """Poll media controller state until playing or timeout. Returns final state."""
+    deadline = time.monotonic() + timeout
+    last_state: str | None = None
+    while time.monotonic() < deadline:
+        time.sleep(1)
+        mc.update_status()  # type: ignore[attr-defined]
+        state: str | None = mc.status.player_state  # type: ignore[union-attr]
+        if state != last_state:
+            remaining = int(deadline - time.monotonic())
+            print(f"  [{remaining:2d}s left]  state={state!r}")
+            last_state = state
+        if state == "PLAYING":
+            break
+    return last_state
 
-    Flow:
-      1. Connect via pychromecast.
-      2. Use yt-dlp to extract a direct HTTPS audio stream URL from the video ID.
-      3. Cast the stream URL via the DefaultMediaReceiver — no YouTube receiver,
-         no lounge API, no screen ID needed. Works on Google Home Mini.
 
-    For YouTube Premium content (audio shows, YouTube Music) you need a cookies
-    file exported from a browser that is signed in with your Premium account:
-        uv run poc.py --video-id ID --cookies ~/yt-cookies.txt
-    Export from Chrome: use the 'Get cookies.txt LOCALLY' extension and save
-    for youtube.com / music.youtube.com.
+def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-arg]
+    """Attempt 1: launch YouTube receiver, get screen ID from MDX channel, use casttube.
+
+    When the YouTube receiver starts it sends an mdxSessionStatus message back
+    through the Cast messaging channel. pychromecast's YouTubeController stores
+    the screen ID from that message in yt_ctrl._screen_id. We poll for it, then
+    hand it to casttube which does the YouTube Lounge API pairing and sends the
+    play command.
+
+    If this works the YouTube receiver handles playback natively — including
+    gapless track transitions and Premium authentication (via the Google account
+    the device is linked to).
+
+    Returns True if playback confirmed, False to signal fallback needed.
     """
-    target = _pick_target(chromecasts, device_name)
+    from pychromecast.controllers.youtube import YouTubeController
+    import casttube  # type: ignore[import-untyped]
 
     print(f"\n{'─' * 60}")
-    print(f"Extracting audio stream for {video_id} via yt-dlp …")
+    print("Approach 1: MDX screen ID → casttube → YouTube receiver")
+
+    yt_ctrl = YouTubeController()
+    target.register_handler(yt_ctrl)  # type: ignore[attr-defined]
+
+    YOUTUBE_APP_ID = "233637DE"
+    if target.app_id != YOUTUBE_APP_ID:  # type: ignore[attr-defined]
+        print("  Launching YouTube receiver …")
+        yt_ctrl.launch()
+    else:
+        print("  YouTube receiver already running.")
+        # Receiver may not re-send session status unprompted — poke it.
+        yt_ctrl.send_message({"type": "getMdxSessionStatus"})
+
+    # Poll for the screen ID that the receiver sends back via the MDX channel.
+    print("  Waiting for MDX session status (screen ID) …")
+    screen_id: str | None = None
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        time.sleep(0.5)
+        val = getattr(yt_ctrl, "_screen_id", None)
+        if val:
+            screen_id = str(val)
+            break
+
+    if not screen_id:
+        print("  No screen ID received — receiver did not send MDX session status.")
+        print("  → Approach 1 cannot continue.")
+        return False
+
+    print(f"  screen_id: {screen_id}")
+
+    print(f"  Sending play command via casttube Lounge API …")
+    try:
+        session = casttube.YouTubeSession(screen_id)
+        session.play_video(video_id)
+        print("  Command sent.")
+    except Exception as exc:
+        print(f"  casttube error: {exc}")
+        return False
+
+    mc = target.media_controller  # type: ignore[attr-defined]
+    final = _poll_media_state(mc, timeout=20)
+    if final == "PLAYING":
+        print("  ✓ Playing via YouTube receiver (gapless-capable).")
+        return True
+
+    print(f"  Final state: {final!r} — Approach 1 did not produce playback.")
+    return False
+
+
+def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None) -> bool:  # type: ignore[type-arg]
+    """Attempt 2: yt-dlp stream extraction + local proxy + Default Media Receiver.
+
+    Works for any content yt-dlp can access. NOT gapless for multi-track albums.
+    Included here as a confirmed fallback for single-track testing.
+    """
+    print(f"\n{'─' * 60}")
+    print("Approach 2: yt-dlp → local proxy → Default Media Receiver")
+
     result = get_audio_stream_url(video_id, cookies_file=cookies_file)
     if not result:
         print("  ERROR: yt-dlp could not extract a stream URL.")
-        print("  If this is Premium/Music content, retry with --cookies <file>.")
-        return
+        return False
     stream_url, mime = result
-    print(f"  Stream URL: {stream_url[:80]}…")
-    print(f"  MIME type:  {mime}")
+    print(f"  Stream URL: {stream_url[:80]}…  ({mime})")
 
-    # Start a local HTTP proxy so the Nest Mini fetches through the Pi.
-    # googlevideo.com stream URLs are signed to the requesting IP — if the
-    # device fetches directly, the CDN rejects it with 403.
-    local_ip = _local_ip_toward(target.cast_info.host)
+    local_ip = _local_ip_toward(target.cast_info.host)  # type: ignore[attr-defined]
     proxy_url = f"http://{local_ip}:{PROXY_PORT}/audio"
     print(f"  Starting local proxy at {proxy_url} …")
     proxy = _start_proxy(stream_url, mime)
 
-    # Self-test: verify the proxy is reachable from this machine before casting.
     try:
         import urllib.request
         with urllib.request.urlopen(
             urllib.request.Request(proxy_url, method="HEAD"), timeout=5
         ) as r:
-            print(f"  Proxy self-test: HTTP {r.status} — proxy is up and reachable")
+            print(f"  Proxy self-test: HTTP {r.status} ✓")
     except Exception as exc:
         print(f"  Proxy self-test FAILED: {exc}")
-        print("  The Nest Mini won't be able to reach this URL either — check firewall / WSL2 networking.")
         proxy.shutdown()
-        return
+        return False
 
-    print(f"\nConnecting to '{target.cast_info.friendly_name}' …")
-    target.wait()
-    print(f"  Connected. Current app: {target.app_display_name!r}")
-
-    # Stop whatever app is running (YouTube receiver, etc.) so the Default
-    # Media Receiver can launch cleanly. Without this, play_media is silently
-    # ignored when another app holds the Cast session.
-    if target.app_id is not None:
-        print(f"  Stopping current app ({target.app_display_name!r}) …")
-        target.quit_app()
+    if target.app_id is not None:  # type: ignore[attr-defined]
+        print(f"  Stopping current app ({target.app_display_name!r}) …")  # type: ignore[attr-defined]
+        target.quit_app()  # type: ignore[attr-defined]
         time.sleep(2)
 
-    mc = target.media_controller
-    print(f"  Casting via Default Media Receiver ({mime}) …")
+    mc = target.media_controller  # type: ignore[attr-defined]
     mc.play_media(proxy_url, mime)
     try:
         mc.block_until_active(timeout=10)
     except Exception as exc:
-        print(f"  block_until_active raised: {exc}")
+        print(f"  block_until_active: {exc}")
 
-    # Poll for up to 20 s for the player to leave IDLE/BUFFERING.
-    deadline = time.monotonic() + 20
-    last_state: str | None = None
-    while time.monotonic() < deadline:
-        time.sleep(1)
-        mc.update_status()
-        state: str | None = mc.status.player_state  # type: ignore[assignment]
-        if state != last_state:
-            remaining = int(deadline - time.monotonic())
-            print(f"  [{remaining:2d}s left]  state={state!r}  pos={mc.status.current_time:.0f}s")
-            last_state = state
-        if state == "PLAYING":
-            print("  Playing!")
-            break
-
-    if last_state != "PLAYING":
-        print(f"  Final state: {last_state!r} — did not reach PLAYING within 20 s.")
-
+    final = _poll_media_state(mc, timeout=20)
     proxy.shutdown()
-    print("Done.")
+
+    if final == "PLAYING":
+        print("  ✓ Playing via Default Media Receiver (no gapless — single track only).")
+        return True
+
+    print(f"  Final state: {final!r} — Approach 2 also failed.")
+    return False
+
+
+def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None) -> None:  # type: ignore[type-arg]
+    target = _pick_target(chromecasts, device_name)
+    print(f"Connecting to '{target.cast_info.friendly_name}' …")
+    target.wait()
+    print(f"  Connected. Current app: {target.app_display_name!r}")
+
+    if not _try_mdx_cast(target, video_id):
+        _try_ytdlp_cast(target, video_id, cookies_file)
+
+    print("\nDone.")
 
 
 # ---------------------------------------------------------------------------
