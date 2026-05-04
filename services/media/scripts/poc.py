@@ -342,12 +342,45 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
             print("  No lounge token returned — screen_id not registered with YouTube.")
             print("  → casttube cannot pair with this screen. Approach 1 is a dead end.")
             return False
-        print("  Lounge token found — screen_id IS registered. Proceeding with casttube.")
+            print("  Lounge token found — screen_id IS registered.")
+        lounge_token: str = lounge_resp.json()["screens"][0]["loungeToken"]
     except Exception as exc:
         print(f"  Lounge API check failed: {exc}")
         return False
 
-    print(f"  Sending play command via casttube Lounge API …")
+    # --- Test A: direct MDX setPlaylist command via pychromecast -----------------
+    # The receiver is confirmed active (it returned session status). Try the
+    # direct Cast-channel play command now — this failed earlier when we called
+    # it before verifying the receiver was ready.
+    print(f"\n  [Test A] Direct MDX play command (yt_ctrl.play_video) …")
+    yt_ctrl.play_video(video_id)
+    time.sleep(6)
+    mc = target.media_controller  # type: ignore[attr-defined]
+    mc.update_status()
+    state_a: str | None = mc.status.player_state  # type: ignore[union-attr]
+    print(f"  [Test A] state after 6s: {state_a!r}")
+    if state_a == "PLAYING":
+        print("  [Test A] ✓ Direct MDX command worked!")
+        return True
+    print("  [Test A] Still IDLE — trying Test B.")
+
+    # --- Test B: send lounge token to receiver via MDX, then casttube -----------
+    # The phone app completes a two-sided bind: it sends the lounge token back to
+    # the receiver via the Cast MDX channel so the receiver joins the session,
+    # THEN sends the play command through the Lounge API. We replicate that here.
+    print(f"\n  [Test B] Binding receiver to lounge session, then casttube …")
+    binding_messages = [
+        # Format 1: remoteConnected — tells receiver a remote client has joined
+        {"type": "remoteConnected", "deviceName": "FamilyPlanner", "loungeToken": lounge_token},
+        # Format 2: setScreenId — some receivers expect this for session linking
+        {"type": "setScreenId", "screenId": screen_id, "loungeToken": lounge_token},
+    ]
+    for msg in binding_messages:
+        print(f"  Sending {msg['type']!r} via MDX channel …")
+        yt_ctrl.send_message(msg)
+        time.sleep(1)
+
+    print(f"  Sending play command via casttube …")
     try:
         session = casttube.YouTubeSession(screen_id)
         session.play_video(video_id)
