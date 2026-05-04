@@ -7,6 +7,7 @@ import { MEMBERS_KEY } from '@web/features/members';
 import { CALENDAR_KEY } from '@web/features/calendar';
 import { WEATHER_KEY } from '@web/features/weather';
 import { SETTINGS_KEY } from '@web/features/admin';
+import { VACUUM_STATUS_KEY } from '@web/features/vacuum';
 
 const STREAKS_KEY = ['streaks'];
 
@@ -52,6 +53,9 @@ const useSseEvents = () => {
           break;
         case 'weather-synced':
           qc.invalidateQueries({ queryKey: WEATHER_KEY });
+          break;
+        case 'vacuum-state-changed':
+          qc.invalidateQueries({ queryKey: VACUUM_STATUS_KEY });
           break;
       }
     });

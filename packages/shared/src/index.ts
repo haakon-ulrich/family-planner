@@ -253,5 +253,6 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('weather-synced'), payload: z.object({ syncedAt: z.string() }) }),
   z.object({ type: z.literal('day-rolled-over'), payload: z.object({ date: z.string() }) }),
   z.object({ type: z.literal('settings-changed'), payload: z.object({}) }),
+  z.object({ type: z.literal('vacuum-state-changed'), payload: z.object({ state: z.string(), battery: z.number().nullable() }) }),
 ]);
 export type SseEvent = z.infer<typeof SseEventSchema>;

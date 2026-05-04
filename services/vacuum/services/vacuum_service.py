@@ -2,17 +2,39 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
+from models import FanSpeed, MopIntensity, Room, VacuumState, VacuumStatus
 from roborock.devices.device import RoborockDevice
 from roborock.devices.device_manager import DeviceManager, create_device_manager
 from roborock.exceptions import RoborockException
-
-from models import VacuumState, VacuumStatus
-from services.auth_service import AuthRequiredError, build_user_params, get_user_data
+from roborock.roborock_typing import RoborockCommand
 from settings import settings
+
+from services.auth_service import AuthRequiredError, build_user_params, get_user_data
 
 logger = logging.getLogger(__name__)
 
 _POLL_INTERVAL = 10  # seconds
+
+# Integer codes sent in the app_segment_clean payload for the Saros 20X.
+# Fan speed codes match VacuumModes in v1_clean_modes.py.
+_FAN_SPEED_CODES: dict[FanSpeed, int] = {
+    FanSpeed.QUIET: 101,
+    FanSpeed.BALANCED: 102,
+    FanSpeed.TURBO: 103,
+    FanSpeed.MAX: 104,
+    FanSpeed.MAX_PLUS: 108,
+}
+
+# Water mode codes — the Saros 20X uses pure-water-flow (water slide mode) codes.
+_MOP_INTENSITY_CODES: dict[MopIntensity, int] = {
+    MopIntensity.OFF: 200,
+    MopIntensity.SLIGHT: 221,
+    MopIntensity.LOW: 225,
+    MopIntensity.MEDIUM: 235,
+    MopIntensity.MODERATE: 245,
+    MopIntensity.HIGH: 248,
+    MopIntensity.EXTREME: 250,
+}
 
 # Maps RoborockStateCode.name (lowercase) → VacuumState.
 # Unknown states (e.g. 6301–6310 mopping variants) fall back to IDLE with a warning.
@@ -223,3 +245,97 @@ def get_status() -> VacuumStatus:
     if _cached_status is None:
         raise RuntimeError("Vacuum service has not started")
     return _cached_status
+
+
+class VacuumError(Exception):
+    """Raised by service functions when a command cannot be executed."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
+
+_ROOM_NAMES: dict[str, str] = {
+    "Living room": "Wohnzimmer",
+    "Bedroom Lars": "Kinderzimmer Lars",
+    "Bedroom Lilly": "Kinderzimmer Lilly",
+    "Bathroom": "Badezimmer Kinder",
+    "Bathroom Parents": "Badezimmer Eltern",
+    "Hall": "Vorraum",
+    "Kitchen": "Küche",
+    "Master bedroom": "Schlafzimmer Eltern",
+}
+
+
+def _require_device() -> RoborockDevice:
+    """Return the connected device or raise VacuumError."""
+    if _device is None:
+        raise VacuumError("VACUUM_OFFLINE", "No device connected")
+    if _cached_status and _cached_status.state == VacuumState.OFFLINE:
+        raise VacuumError("VACUUM_OFFLINE", "Vacuum is offline")
+    if _cached_status and _cached_status.state == VacuumState.AUTH_REQUIRED:
+        raise VacuumError("VACUUM_AUTH_REQUIRED", "Re-authentication required")
+    return _device
+
+
+async def get_rooms() -> list[Room]:
+    """Fetch the current room list from the device."""
+    device = _require_device()
+    props = device.v1_properties
+    if props is None:
+        raise VacuumError("VACUUM_OFFLINE", "Device has no v1 properties")
+    try:
+        await props.rooms.refresh()
+    except RoborockException as exc:
+        raise VacuumError("VACUUM_COMMAND_FAILED", str(exc)) from exc
+    return [
+        Room(id=seg_id, name=_ROOM_NAMES.get(mapping.name, mapping.name))
+        for seg_id, mapping in props.rooms.room_map.items()
+    ]
+
+
+async def clean(
+    room_ids: list[int], repeats: int, fan_speed: FanSpeed, mop_intensity: MopIntensity
+) -> None:
+    """Start segment cleaning for the given rooms."""
+    device = _require_device()
+    props = device.v1_properties
+    if props is None:
+        raise VacuumError("VACUUM_OFFLINE", "Device has no v1 properties")
+    params: list[dict[str, int | str | list[int]]] = [
+        {
+            "segments": room_ids,
+            "repeat": repeats,
+            "fanspeed": _FAN_SPEED_CODES[fan_speed],
+            "water_box_mode": _MOP_INTENSITY_CODES[mop_intensity],
+        }
+    ]
+    try:
+        await props.command.send(RoborockCommand.APP_SEGMENT_CLEAN, params)
+    except RoborockException as exc:
+        raise VacuumError("VACUUM_COMMAND_FAILED", str(exc)) from exc
+
+
+async def dock() -> None:
+    """Send the vacuum back to its dock."""
+    device = _require_device()
+    props = device.v1_properties
+    if props is None:
+        raise VacuumError("VACUUM_OFFLINE", "Device has no v1 properties")
+    try:
+        await props.command.send(RoborockCommand.APP_CHARGE)
+    except RoborockException as exc:
+        raise VacuumError("VACUUM_COMMAND_FAILED", str(exc)) from exc
+
+
+async def stop_cleaning() -> None:
+    """Stop the current job without returning to dock."""
+    device = _require_device()
+    props = device.v1_properties
+    if props is None:
+        raise VacuumError("VACUUM_OFFLINE", "Device has no v1 properties")
+    try:
+        await props.command.send(RoborockCommand.APP_STOP)
+    except RoborockException as exc:
+        raise VacuumError("VACUUM_COMMAND_FAILED", str(exc)) from exc

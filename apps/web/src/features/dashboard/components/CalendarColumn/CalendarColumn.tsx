@@ -3,6 +3,7 @@ import { addDays, parseISO } from 'date-fns'
 import CalendarSection from './components/CalendarSection'
 import WeatherSection from './components/WeatherSection'
 import VacuumWidget from './components/VacuumWidget'
+import { VacuumControls } from '@web/features/vacuum'
 import { useDashboardDate } from '../../DashboardDate'
 import { useCalendarEvents } from '@web/features/calendar'
 import { useMembers } from '@web/features/members'
@@ -116,6 +117,7 @@ const CalendarColumn = () => {
       </div>
 
       <VacuumWidget />
+      <VacuumControls />
     </div>
   )
 }
