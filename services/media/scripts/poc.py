@@ -325,6 +325,28 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
 
     print(f"  screen_id: {screen_id}")
 
+    # Verify the screen_id is registered with YouTube's Lounge API before
+    # handing it to casttube. If this returns no token the screen_id is not
+    # known to YouTube and casttube's play command will silently go nowhere.
+    print("  Verifying screen_id against YouTube Lounge API …")
+    try:
+        import requests as req_lib
+        lounge_resp = req_lib.get(
+            "https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch",
+            params={"screen_ids": screen_id},
+            timeout=8,
+        )
+        print(f"  Lounge API → HTTP {lounge_resp.status_code}")
+        print(f"  Lounge API body: {lounge_resp.text[:300]!r}")
+        if not lounge_resp.ok or '"loungeToken"' not in lounge_resp.text:
+            print("  No lounge token returned — screen_id not registered with YouTube.")
+            print("  → casttube cannot pair with this screen. Approach 1 is a dead end.")
+            return False
+        print("  Lounge token found — screen_id IS registered. Proceeding with casttube.")
+    except Exception as exc:
+        print(f"  Lounge API check failed: {exc}")
+        return False
+
     print(f"  Sending play command via casttube Lounge API …")
     try:
         session = casttube.YouTubeSession(screen_id)
