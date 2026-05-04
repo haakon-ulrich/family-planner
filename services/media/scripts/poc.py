@@ -3,6 +3,8 @@
 # dependencies = [
 #   "ytmusicapi>=1.8",
 #   "pychromecast>=14.0",
+#   "casttube>=0.2.0",
+#   "requests>=2.32",
 # ]
 # ///
 """
@@ -146,64 +148,118 @@ def discover_cast_devices(timeout: int = 8) -> tuple[list, object]:  # type: ign
 # Step 3 — Cast a video to a device
 # ---------------------------------------------------------------------------
 
-def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> None:  # type: ignore[type-arg]
-    """Connect to a Cast device and queue a YouTube video by ID."""
-    try:
-        from pychromecast.controllers.youtube import YouTubeController
-    except ImportError:
-        print("pychromecast not available.")
-        return
-
-    target = None
+def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[type-arg]
     if device_name:
         for cc in chromecasts:
             if cc.cast_info.friendly_name.lower() == device_name.lower():
-                target = cc
-                break
-        if target is None:
-            names = [cc.cast_info.friendly_name for cc in chromecasts]
-            print(f"Device {device_name!r} not found. Available: {names}")
-            print("Falling back to first device.")
+                return cc
+        names = [cc.cast_info.friendly_name for cc in chromecasts]
+        print(f"Device {device_name!r} not found. Available: {names}. Using first.")
+    return chromecasts[0]
 
-    if target is None:
-        target = chromecasts[0]
 
-    name = target.cast_info.friendly_name
+def _get_screen_id(host: str, launch_wait: int = 6) -> str | None:
+    """Get the YouTube receiver's screenId from the Cast device HTTP API.
+
+    The device exposes an HTTP endpoint at :8008/apps/YouTube that returns XML
+    describing the running YouTube cast receiver app. Once the app is running,
+    the XML contains a <screenId> element (or it's embedded as JSON in
+    <additionalData>). We try both formats.
+    """
+    import re
+    import requests
+
+    url = f"http://{host}:8008/apps/YouTube"
+    deadline = time.monotonic() + launch_wait
+    while time.monotonic() < deadline:
+        try:
+            resp = requests.get(url, timeout=3)
+            text = resp.text
+            # Format 1: <screenId>…</screenId>
+            m = re.search(r"<screenId>([^<]+)</screenId>", text)
+            if m:
+                return m.group(1).strip()
+            # Format 2: JSON blob inside <additionalData>
+            m = re.search(r'"screenId"\s*:\s*"([^"]+)"', text)
+            if m:
+                return m.group(1).strip()
+        except requests.RequestException:
+            pass
+        time.sleep(1)
+    return None
+
+
+def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> None:  # type: ignore[type-arg]
+    """Cast a YouTube video using the Lounge API (via casttube).
+
+    Flow:
+      1. Connect via pychromecast and launch the YouTube receiver app.
+      2. Retrieve the receiver's screenId from the device's HTTP API (:8008).
+      3. Hand off to casttube which does the full Lounge API handshake and
+         sends the play command — the same path the YouTube mobile app uses.
+    """
+    try:
+        from pychromecast.controllers.youtube import YouTubeController
+        import casttube
+    except ImportError as exc:
+        print(f"Missing dependency: {exc}. Run: uv run poc.py")
+        return
+
+    target = _pick_target(chromecasts, device_name)
+    host = target.cast_info.host
+
     print(f"\n{'─' * 60}")
-    print(f"Connecting to '{name}' …")
+    print(f"Connecting to '{target.cast_info.friendly_name}' …")
     target.wait()
     print(f"  Connected. Current app: {target.app_display_name!r}")
 
-    print(f"  Casting YouTube video: {video_id}")
+    # Launch the YouTube receiver if it isn't already open.
     yt_ctrl = YouTubeController()
     target.register_handler(yt_ctrl)
-    yt_ctrl.play_video(video_id)
+    if target.app_id != YouTubeController.APP_ID:
+        print("  Launching YouTube receiver …")
+        yt_ctrl.launch()
+        time.sleep(4)
+    else:
+        print("  YouTube receiver already running.")
 
-    # Poll up to 20 s for the media state to leave IDLE.
-    # YouTube receiver needs time to launch, authenticate, and buffer.
+    # Retrieve the screenId the receiver advertises over HTTP.
+    print(f"  Fetching screenId from http://{host}:8008/apps/YouTube …")
+    screen_id = _get_screen_id(host, launch_wait=8)
+    if not screen_id:
+        print(
+            "  ERROR: could not get screenId from device HTTP API.\n"
+            "  The YouTube app may not have fully started, or port 8008 is firewalled."
+        )
+        return
+    print(f"  screenId: {screen_id}")
+
+    # Use casttube (YouTube Lounge API) to actually queue the video.
+    # This is what the YouTube mobile app does when you hit the cast button.
+    print(f"  Sending play command via Lounge API: {video_id} …")
+    try:
+        session = casttube.YouTubeSession(screen_id)
+        session.play_video(video_id)
+        print("  Command sent. Video should start within a few seconds.")
+    except Exception as exc:
+        print(f"  Lounge API error: {exc}")
+        return
+
+    # Poll the standard media controller as a rough confirmation.
     mc = target.media_controller
-    deadline = time.monotonic() + 20
-    last_state = None
+    deadline = time.monotonic() + 15
+    last_state: str | None = None
     while time.monotonic() < deadline:
         time.sleep(1)
         mc.update_status()
-        state = mc.status.player_state
-        content = mc.status.content_id
+        state: str | None = mc.status.player_state  # type: ignore[assignment]
         if state != last_state:
-            print(f"  [{int(deadline - time.monotonic()):2d}s left]  state={state!r}  content_id={content!r}")
+            remaining = int(deadline - time.monotonic())
+            print(f"  [{remaining:2d}s left]  media state={state!r}")
             last_state = state
         if state not in (None, "IDLE", "BUFFERING"):
             break
 
-    print(f"\n  Final state: {mc.status.player_state!r}")
-    print(f"  Content ID:  {mc.status.content_id!r}")
-    if mc.status.player_state in (None, "IDLE"):
-        print(
-            "\n  NOTE: stayed IDLE. Possible causes:\n"
-            "    1. Premium/Music content needs a linked Google session (auth issue)\n"
-            "    2. Video is region-locked or unavailable\n"
-            "    Try with a known-public video: --video-id dQw4w9WgXcQ"
-        )
     print("Done.")
 
 
