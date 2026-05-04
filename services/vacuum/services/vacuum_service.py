@@ -58,9 +58,9 @@ _STATE_MAP: dict[str, VacuumState] = {
     "going_to_target": VacuumState.CLEANING,
     "zoned_cleaning": VacuumState.CLEANING,
     "segment_cleaning": VacuumState.CLEANING,
-    "emptying_the_bin": VacuumState.DOCKED,
-    "washing_the_mop": VacuumState.DOCKED,
-    "washing_the_mop_2": VacuumState.DOCKED,
+    "emptying_the_bin": VacuumState.EMPTYING_BIN,
+    "washing_the_mop": VacuumState.WASHING_MOP,
+    "washing_the_mop_2": VacuumState.WASHING_MOP,
     "going_to_wash_the_mop": VacuumState.RETURNING,
     "in_call": VacuumState.IDLE,
     "mapping": VacuumState.CLEANING,
@@ -71,7 +71,7 @@ _STATE_MAP: dict[str, VacuumState] = {
     "charging_complete": VacuumState.DOCKED,
     "device_offline": VacuumState.OFFLINE,
     "locked": VacuumState.IDLE,
-    "air_drying_stopping": VacuumState.DOCKED,
+    "air_drying_stopping": VacuumState.DRYING_MOP,
 }
 
 _device_manager: DeviceManager | None = None

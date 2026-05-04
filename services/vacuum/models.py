@@ -14,6 +14,9 @@ class VacuumState(StrEnum):
     ERROR = auto()
     OFFLINE = auto()
     AUTH_REQUIRED = auto()
+    WASHING_MOP = auto()
+    DRYING_MOP = auto()
+    EMPTYING_BIN = auto()
 
 
 class FanSpeed(StrEnum):

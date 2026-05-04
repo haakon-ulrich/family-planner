@@ -107,14 +107,19 @@ def browse_music(query: str) -> str | None:
 # Step 2 — Google Cast device discovery
 # ---------------------------------------------------------------------------
 
-def discover_cast_devices(timeout: int = 8) -> list:  # type: ignore[type-arg]
-    """Discover all Google Cast devices on the LAN via mDNS."""
+def discover_cast_devices(timeout: int = 8) -> tuple[list, object]:  # type: ignore[type-arg]
+    """Discover all Google Cast devices on the LAN via mDNS.
+
+    Returns (chromecasts, browser). The caller must call
+    pychromecast.discovery.stop_discovery(browser) once casting is done —
+    stopping it early kills the zeroconf instance that pychromecast uses
+    to resolve device addresses during connect.
+    """
     try:
         import pychromecast
-        import pychromecast.discovery
     except ImportError:
         print("ERROR: pychromecast not installed. Run: uv run poc.py")
-        return []
+        return [], None
 
     print(f"\n{'─' * 60}")
     print(f"Discovering Cast devices (timeout: {timeout} s) …")
@@ -134,8 +139,7 @@ def discover_cast_devices(timeout: int = 8) -> list:  # type: ignore[type-arg]
                 f"  type={info.cast_type}  model={info.model_name}"
             )
 
-    pychromecast.discovery.stop_discovery(browser)
-    return chromecasts  # type: ignore[return-value]
+    return chromecasts, browser  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -205,28 +209,33 @@ def main() -> None:
     if not video_id:
         video_id = browse_music(args.query)
 
-    # Step 2: discover devices
-    chromecasts = discover_cast_devices(timeout=args.timeout)
+    # Step 2: discover devices — keep browser alive until casting is done
+    chromecasts, browser = discover_cast_devices(timeout=args.timeout)
 
-    # Step 3: optionally cast
-    if args.no_cast:
-        print("\n--no-cast set: skipping playback.")
-        sys.exit(0)
+    try:
+        # Step 3: optionally cast
+        if args.no_cast:
+            print("\n--no-cast set: skipping playback.")
+            return
 
-    if not video_id:
-        print("\nNo video ID to cast — rerun with --video-id <id> to test casting manually.")
-        sys.exit(0)
+        if not video_id:
+            print("\nNo video ID to cast — rerun with --video-id <id> to test casting manually.")
+            return
 
-    if not chromecasts:
-        print("\nNo Cast devices found — try running this from the Pi directly.")
-        sys.exit(0)
+        if not chromecasts:
+            print("\nNo Cast devices found — try running this from the Pi directly.")
+            return
 
-    print(f"\nReady to cast video {video_id!r} to a Cast device.")
-    confirm = input("Proceed? [y/N] ").strip().lower()
-    if confirm == "y":
-        cast_video(chromecasts, args.cast_name, video_id)
-    else:
-        print("Skipped.")
+        print(f"\nReady to cast video {video_id!r} to a Cast device.")
+        confirm = input("Proceed? [y/N] ").strip().lower()
+        if confirm == "y":
+            cast_video(chromecasts, args.cast_name, video_id)
+        else:
+            print("Skipped.")
+    finally:
+        if browser is not None:
+            import pychromecast.discovery
+            pychromecast.discovery.stop_discovery(browser)
 
 
 if __name__ == "__main__":

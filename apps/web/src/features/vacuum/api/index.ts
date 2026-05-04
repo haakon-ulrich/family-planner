@@ -6,7 +6,10 @@ export type VacuumState =
   | 'paused'
   | 'error'
   | 'offline'
-  | 'auth_required';
+  | 'auth_required'
+  | 'washing_mop'
+  | 'drying_mop'
+  | 'emptying_bin';
 
 export type VacuumStatus = {
   state: VacuumState;

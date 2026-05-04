@@ -1,4 +1,4 @@
-import { AlertCircle, BatteryFull, BatteryMedium, BatteryWarning, Droplet, Droplets, Home, Pause, RotateCcw, Wind, WifiOff, Zap } from 'lucide-react';
+import { AlertCircle, BatteryFull, BatteryMedium, BatteryWarning, Droplet, Droplets, Home, Pause, RotateCcw, Trash2, Waves, Wind, WifiOff, Zap } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useVacuumStatus, useVacuumRooms, useClean, useDock, useStop } from '@web/features/vacuum/hooks';
 import { useVacuumStore } from '@web/features/vacuum/store';
@@ -19,6 +19,9 @@ const STATE_CONFIG: Record<VacuumState, { Icon: LucideIcon | IconComponent; labe
   error:         { Icon: AlertCircle,      label: 'Fehler',            color: 'text-red-400'     },
   offline:       { Icon: WifiOff,          label: 'Offline',           color: 'text-slate-500'   },
   auth_required: { Icon: RobotVacuumIcon,  label: 'Einrichtung nötig', color: 'text-amber-400'   },
+  washing_mop:   { Icon: Waves,            label: 'Wäscht Mopp',       color: 'text-cyan-400'    },
+  drying_mop:    { Icon: Wind,             label: 'Trocknet Mopp',     color: 'text-sky-300'     },
+  emptying_bin:  { Icon: Trash2,           label: 'Leert Behälter',    color: 'text-slate-400'   },
 };
 
 const batteryColor = (pct: number) =>
