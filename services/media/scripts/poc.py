@@ -26,8 +26,11 @@ Run:
 from __future__ import annotations
 
 import argparse
+import socket
 import sys
+import threading
 import time
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
 # ---------------------------------------------------------------------------
@@ -148,6 +151,62 @@ def discover_cast_devices(timeout: int = 8) -> tuple[list, object]:  # type: ign
 # Step 3 — Cast a video to a device
 # ---------------------------------------------------------------------------
 
+PROXY_PORT = 9877
+
+
+class _AudioProxy(BaseHTTPRequestHandler):
+    """Single-stream HTTP proxy.
+
+    Serves the signed googlevideo.com URL as a local HTTP endpoint so the
+    Cast device fetches through the Pi (matching the IP the URL was signed for).
+    """
+    stream_url: str = ""
+    mime: str = "audio/mp4"
+
+    def do_GET(self) -> None:
+        import urllib.request
+        range_header = self.headers.get("Range", "")
+        req_headers: dict[str, str] = {"User-Agent": "Mozilla/5.0"}
+        if range_header:
+            req_headers["Range"] = range_header
+        req = urllib.request.Request(self.stream_url, headers=req_headers)
+        try:
+            with urllib.request.urlopen(req, timeout=15) as upstream:
+                self.send_response(upstream.status)
+                self.send_header("Content-Type", self.mime)
+                self.send_header("Accept-Ranges", "bytes")
+                for header in ("Content-Length", "Content-Range"):
+                    val = upstream.headers.get(header)
+                    if val:
+                        self.send_header(header, val)
+                self.end_headers()
+                while True:
+                    chunk = upstream.read(65536)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except Exception as exc:
+            self.send_error(502, str(exc))
+
+    def log_message(self, fmt: str, *args: object) -> None:
+        pass  # suppress per-request log noise
+
+
+def _start_proxy(stream_url: str, mime: str) -> HTTPServer:
+    _AudioProxy.stream_url = stream_url
+    _AudioProxy.mime = mime
+    server = HTTPServer(("0.0.0.0", PROXY_PORT), _AudioProxy)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server
+
+
+def _local_ip_toward(remote_host: str) -> str:
+    """Return the local IP address that routes toward remote_host."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+        s.connect((remote_host, 8009))
+        return s.getsockname()[0]
+
+
 def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[type-arg]
     if device_name:
         for cc in chromecasts:
@@ -219,13 +278,21 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookie
     print(f"  Stream URL: {stream_url[:80]}…")
     print(f"  MIME type:  {mime}")
 
+    # Start a local HTTP proxy so the Nest Mini fetches through the Pi.
+    # googlevideo.com stream URLs are signed to the requesting IP — if the
+    # device fetches directly, the CDN rejects it with 403.
+    local_ip = _local_ip_toward(target.cast_info.host)
+    proxy_url = f"http://{local_ip}:{PROXY_PORT}/audio"
+    print(f"  Starting local proxy at {proxy_url} …")
+    proxy = _start_proxy(stream_url, mime)
+
     print(f"\nConnecting to '{target.cast_info.friendly_name}' …")
     target.wait()
     print(f"  Connected. Current app: {target.app_display_name!r}")
 
     mc = target.media_controller
-    print(f"  Casting stream ({mime}) …")
-    mc.play_media(stream_url, mime)
+    print(f"  Casting via proxy ({mime}) …")
+    mc.play_media(proxy_url, mime)
     mc.block_until_active(timeout=10)
 
     # Poll for up to 20 s for the player to leave IDLE/BUFFERING.
@@ -245,6 +312,8 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookie
 
     if last_state != "PLAYING":
         print(f"  Final state: {last_state!r} — did not reach PLAYING within 20 s.")
+
+    proxy.shutdown()
     print("Done.")
 
 
