@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from models import HealthData, HealthResponse
 from routers.commands import router as commands_router
+from routers.map import router as map_router
 from routers.rooms import router as rooms_router
 from routers.status import router as status_router
 from services.vacuum_service import start
@@ -31,6 +32,7 @@ app = FastAPI(title="Vacuum Sidecar", lifespan=lifespan)
 app.include_router(status_router)
 app.include_router(rooms_router)
 app.include_router(commands_router)
+app.include_router(map_router)
 
 
 @app.get("/health")

@@ -4,27 +4,38 @@ import { useVacuumStore } from '@web/features/vacuum/store';
 const VacuumControls = () => {
   const { data: status } = useVacuumStatus();
   const { data: rooms } = useVacuumRooms();
-  const { selectedRoomId, setSelectedRoomId } = useVacuumStore();
+  const { selectedRoomIds, clearRooms, toggleRoomId, fanSpeed, mopIntensity } = useVacuumStore();
   const clean = useClean();
   const dock = useDock();
   const stop = useStop();
 
   const state = status?.state;
-  const isOffline = !state || state === 'offline' || state === 'error' || state === 'auth_required';
+  const isUnavailable = !state || state === 'offline' || state === 'auth_required';
+
+  if (isUnavailable) return null;
+
+  const isOffline = state === 'error';
   const isActive = state === 'cleaning' || state === 'returning';
   const isActing = clean.isPending || dock.isPending || stop.isPending;
+
+  const selectedRoomId = selectedRoomIds[0] ?? null;
   const canStart = !isOffline && !isActive && !isActing && selectedRoomId !== null;
+
+  const handleRoomChange = (id: number | null) => {
+    clearRooms();
+    if (id !== null) toggleRoomId(id);
+  };
 
   const handleClean = () => {
     if (selectedRoomId === null) return;
-    clean.mutate({ room_ids: [selectedRoomId], repeats: 1, fan_speed: 'balanced', mop_intensity: 'medium' });
+    clean.mutate({ room_ids: [selectedRoomId], repeats: 1, fan_speed: fanSpeed, mop_intensity: mopIntensity });
   };
 
   return (
     <div className="px-5 pb-4 space-y-2">
       <select
         value={selectedRoomId ?? ''}
-        onChange={(e) => setSelectedRoomId(e.target.value ? Number(e.target.value) : null)}
+        onChange={(e) => handleRoomChange(e.target.value ? Number(e.target.value) : null)}
         disabled={isOffline}
         className="w-full bg-slate-800 border border-slate-600 rounded text-sm text-slate-200 px-2.5 py-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
       >

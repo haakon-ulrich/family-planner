@@ -256,7 +256,7 @@ class VacuumError(Exception):
         self.message = message
 
 
-_ROOM_NAMES: dict[str, str] = {
+ROOM_NAMES: dict[str, str] = {
     "Living room": "Wohnzimmer",
     "Bedroom Lars": "Kinderzimmer Lars",
     "Bedroom Lilly": "Kinderzimmer Lilly",
@@ -290,7 +290,7 @@ async def get_rooms() -> list[Room]:
     except RoborockException as exc:
         raise VacuumError("VACUUM_COMMAND_FAILED", str(exc)) from exc
     return [
-        Room(id=seg_id, name=_ROOM_NAMES.get(mapping.name, mapping.name))
+        Room(id=seg_id, name=ROOM_NAMES.get(mapping.name, mapping.name))
         for seg_id, mapping in props.rooms.room_map.items()
     ]
 

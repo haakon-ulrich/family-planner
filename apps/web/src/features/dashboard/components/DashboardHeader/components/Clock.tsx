@@ -17,7 +17,7 @@ const Clock = () => {
   }, []);
 
   return (
-    <span className="text-slate-400 md:text-3xl font-mono tabular-nums select-none">{time}</span>
+    <span className="hidden md:inline text-slate-400 md:text-3xl font-mono tabular-nums select-none">{time}</span>
   );
 };
 

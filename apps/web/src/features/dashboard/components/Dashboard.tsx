@@ -38,7 +38,7 @@ const Dashboard = () => {
 
   return (
     <DashboardDateProvider date={date}>
-      <div className="h-dvh w-screen overflow-hidden flex flex-col bg-slate-900 text-white">
+      <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-slate-900 text-white">
         <DashboardHeader
           date={date}
           onPrev={() => setDate((d) => shiftDate(d, -1))}

@@ -56,3 +56,21 @@ export const postDock = (): Promise<{ ok: boolean }> =>
 
 export const postStop = (): Promise<{ ok: boolean }> =>
   fetch('/api/vacuum/stop', { method: 'POST' }).then((r) => json<{ ok: boolean }>(r));
+
+export type RoomGeometry = {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type VacuumMap = {
+  image: string | null;
+  image_width: number | null;
+  image_height: number | null;
+  rooms: RoomGeometry[];
+};
+
+export const fetchVacuumMap = (): Promise<VacuumMap> =>
+  fetch('/api/vacuum/map').then((r) => json<VacuumMap>(r));

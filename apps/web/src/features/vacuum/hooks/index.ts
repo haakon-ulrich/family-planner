@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchVacuumRooms, fetchVacuumStatus, postClean, postDock, postStop } from '../api';
+import { fetchVacuumMap, fetchVacuumRooms, fetchVacuumStatus, postClean, postDock, postStop } from '../api';
 import type { CleanRequest } from '../api';
 
 export const VACUUM_STATUS_KEY = ['vacuum', 'status'] as const;
@@ -42,3 +42,12 @@ export const useStop = () => {
     onSuccess: () => qc.invalidateQueries({ queryKey: VACUUM_STATUS_KEY }),
   });
 };
+
+export const VACUUM_MAP_KEY = ['vacuum', 'map'] as const;
+
+export const useVacuumMap = () =>
+  useQuery({
+    queryKey: VACUUM_MAP_KEY,
+    queryFn: fetchVacuumMap,
+    refetchInterval: 5_000,
+  });

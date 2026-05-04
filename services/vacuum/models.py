@@ -77,3 +77,22 @@ class RoomsResponse(BaseModel):
 
 class CommandResponse(BaseModel):
     data: CommandData
+
+
+class RoomGeometry(BaseModel):
+    id: int
+    x: int
+    y: int
+    width: int
+    height: int
+
+
+class MapData(BaseModel):
+    image: str | None
+    image_width: int | None = None
+    image_height: int | None = None
+    rooms: list[RoomGeometry] = []
+
+
+class MapResponse(BaseModel):
+    data: MapData

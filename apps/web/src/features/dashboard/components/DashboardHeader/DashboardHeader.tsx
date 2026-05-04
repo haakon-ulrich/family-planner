@@ -1,5 +1,4 @@
-import { ChevronLeft, ChevronRight, Flame, Settings, Volume2, VolumeX } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Flame, Volume2, VolumeX } from 'lucide-react';
 import { parseISO } from 'date-fns';
 import { useHouseholdStreak } from '@web/features/streaks';
 import { useDashboardStore } from '@web/features/dashboard/store';
@@ -25,7 +24,7 @@ const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps
   const toggleMuted = useDashboardStore((s) => s.toggleMuted);
 
   return (
-    <header className="flex-none flex items-center justify-between px-3 sm:px-6 py-3 bg-slate-800 border-b border-slate-700/60">
+    <header className="flex-none flex items-center justify-between pl-14 pr-3 sm:px-6 py-3 bg-slate-800 border-b border-slate-700/60">
       <div className="flex items-center gap-4 shrink-0">
         <Clock />
         <button
@@ -70,12 +69,6 @@ const DashboardHeader = ({ date, onPrev, onNext, onToday }: DashboardHeaderProps
             <Volume2 className="w-5 h-5 text-slate-400 hover:text-white" />
           )}
         </button>
-        <Link
-          to="/admin"
-          className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-700 transition-colors cursor-pointer"
-        >
-          <Settings className="w-5 h-5" />
-        </Link>
       </div>
     </header>
   );

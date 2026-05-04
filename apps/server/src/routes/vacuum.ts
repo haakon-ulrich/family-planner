@@ -97,4 +97,14 @@ app.post('/stop', async (c) => {
   }
 });
 
+app.get('/map', async (c) => {
+  try {
+    const { body, status } = await proxyGet('/map');
+    return c.json(body, status as 200);
+  } catch (err) {
+    log.warn({ err }, 'Vacuum sidecar unreachable');
+    return c.json(offline(), 503);
+  }
+});
+
 export default app;
