@@ -189,7 +189,7 @@ class _AudioProxy(BaseHTTPRequestHandler):
             self.send_error(502, str(exc))
 
     def log_message(self, fmt: str, *args: object) -> None:
-        pass  # suppress per-request log noise
+        print(f"  [proxy] {self.address_string()} {fmt % args}")
 
 
 def _start_proxy(stream_url: str, mime: str) -> HTTPServer:
@@ -286,14 +286,38 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookie
     print(f"  Starting local proxy at {proxy_url} …")
     proxy = _start_proxy(stream_url, mime)
 
+    # Self-test: verify the proxy is reachable from this machine before casting.
+    try:
+        import urllib.request
+        with urllib.request.urlopen(
+            urllib.request.Request(proxy_url, method="HEAD"), timeout=5
+        ) as r:
+            print(f"  Proxy self-test: HTTP {r.status} — proxy is up and reachable")
+    except Exception as exc:
+        print(f"  Proxy self-test FAILED: {exc}")
+        print("  The Nest Mini won't be able to reach this URL either — check firewall / WSL2 networking.")
+        proxy.shutdown()
+        return
+
     print(f"\nConnecting to '{target.cast_info.friendly_name}' …")
     target.wait()
     print(f"  Connected. Current app: {target.app_display_name!r}")
 
+    # Stop whatever app is running (YouTube receiver, etc.) so the Default
+    # Media Receiver can launch cleanly. Without this, play_media is silently
+    # ignored when another app holds the Cast session.
+    if target.app_id is not None:
+        print(f"  Stopping current app ({target.app_display_name!r}) …")
+        target.quit_app()
+        time.sleep(2)
+
     mc = target.media_controller
-    print(f"  Casting via proxy ({mime}) …")
+    print(f"  Casting via Default Media Receiver ({mime}) …")
     mc.play_media(proxy_url, mime)
-    mc.block_until_active(timeout=10)
+    try:
+        mc.block_until_active(timeout=10)
+    except Exception as exc:
+        print(f"  block_until_active raised: {exc}")
 
     # Poll for up to 20 s for the player to leave IDLE/BUFFERING.
     deadline = time.monotonic() + 20
