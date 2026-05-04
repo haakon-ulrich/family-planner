@@ -216,7 +216,8 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str) -> Non
     # Launch the YouTube receiver if it isn't already open.
     yt_ctrl = YouTubeController()
     target.register_handler(yt_ctrl)
-    if target.app_id != YouTubeController.APP_ID:
+    YOUTUBE_APP_ID = "233637DE"
+    if target.app_id != YOUTUBE_APP_ID:
         print("  Launching YouTube receiver …")
         yt_ctrl.launch()
         time.sleep(4)
