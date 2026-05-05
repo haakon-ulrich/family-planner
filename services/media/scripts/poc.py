@@ -28,15 +28,14 @@ from __future__ import annotations
 
 import argparse
 import socket
-import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-
 # ---------------------------------------------------------------------------
 # Step 1 — YouTube Music content browsing
 # ---------------------------------------------------------------------------
+
 
 def browse_music(query: str) -> str | None:
     """Search YouTube Music and return the first castable video ID found."""
@@ -91,7 +90,9 @@ def browse_music(query: str) -> str | None:
             if browse_id != "—":
                 try:
                     album_data: dict[str, object] = yt.get_album(browse_id)  # type: ignore[assignment]
-                    tracks: list[dict[str, object]] = (album_data.get("tracks") or [])[:5]  # type: ignore[assignment]
+                    tracks: list[dict[str, object]] = (album_data.get("tracks") or [])[
+                        :5
+                    ]  # type: ignore[assignment]
                     for t in tracks:  # type: ignore[union-attr]
                         track: dict[str, object] = t  # type: ignore[assignment]
                         vid = str(track.get("videoId") or "—")
@@ -131,6 +132,7 @@ def browse_music(query: str) -> str | None:
 # ---------------------------------------------------------------------------
 # Step 2 — Google Cast device discovery
 # ---------------------------------------------------------------------------
+
 
 def discover_cast_devices(timeout: int = 8) -> tuple[list, object]:  # type: ignore[type-arg]
     """Discover all Google Cast devices on the LAN via mDNS.
@@ -180,11 +182,13 @@ class _AudioProxy(BaseHTTPRequestHandler):
     Serves the signed googlevideo.com URL as a local HTTP endpoint so the
     Cast device fetches through the Pi (matching the IP the URL was signed for).
     """
+
     stream_url: str = ""
     mime: str = "audio/mp4"
 
     def do_GET(self) -> None:
         import urllib.request
+
         range_header = self.headers.get("Range", "")
         req_headers: dict[str, str] = {"User-Agent": "Mozilla/5.0"}
         if range_header:
@@ -267,6 +271,7 @@ def get_audio_stream_url(
         "no_warnings": False,
         # EJS challenge solver — requires yt-dlp[default] and node installed.
         "js_runtime": "node",
+        "verbose": True,
     }
     if use_oauth:
         ydl_opts["username"] = "oauth2"
@@ -286,7 +291,9 @@ def get_audio_stream_url(
             fmt_id: str = info.get("format_id", "?")
             abr: float | None = info.get("abr")
             print(f"  yt-dlp selected format: {fmt_id}  ext={ext}  abr={abr}kbps")
-            mime = {"m4a": "audio/mp4", "webm": "audio/webm", "mp3": "audio/mpeg"}.get(ext, "audio/mp4")
+            mime = {"m4a": "audio/mp4", "webm": "audio/webm", "mp3": "audio/mpeg"}.get(
+                ext, "audio/mp4"
+            )
             return stream_url, mime
     except Exception as exc:
         print(f"  yt-dlp error: {exc}")
@@ -325,8 +332,8 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
 
     Returns True if playback confirmed, False to signal fallback needed.
     """
-    from pychromecast.controllers.youtube import YouTubeController
     import casttube  # type: ignore[import-untyped]
+    from pychromecast.controllers.youtube import YouTubeController
 
     print(f"\n{'─' * 60}")
     print("Approach 1: MDX screen ID → casttube → YouTube receiver")
@@ -367,6 +374,7 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
     print("  Verifying screen_id against YouTube Lounge API …")
     try:
         import requests as req_lib
+
         lounge_resp = req_lib.get(
             "https://www.youtube.com/api/lounge/pairing/get_lounge_token_batch",
             params={"screen_ids": screen_id},
@@ -376,7 +384,9 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
         print(f"  Lounge API body: {lounge_resp.text[:300]!r}")
         if not lounge_resp.ok or '"loungeToken"' not in lounge_resp.text:
             print("  No lounge token returned — screen_id not registered with YouTube.")
-            print("  → casttube cannot pair with this screen. Approach 1 is a dead end.")
+            print(
+                "  → casttube cannot pair with this screen. Approach 1 is a dead end."
+            )
             return False
             print("  Lounge token found — screen_id IS registered.")
         lounge_token: str = lounge_resp.json()["screens"][0]["loungeToken"]
@@ -388,7 +398,7 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
     # The receiver is confirmed active (it returned session status). Try the
     # direct Cast-channel play command now — this failed earlier when we called
     # it before verifying the receiver was ready.
-    print(f"\n  [Test A] Direct MDX play command (yt_ctrl.play_video) …")
+    print("\n  [Test A] Direct MDX play command (yt_ctrl.play_video) …")
     yt_ctrl.play_video(video_id)
     time.sleep(6)
     mc = target.media_controller  # type: ignore[attr-defined]
@@ -404,10 +414,14 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
     # The phone app completes a two-sided bind: it sends the lounge token back to
     # the receiver via the Cast MDX channel so the receiver joins the session,
     # THEN sends the play command through the Lounge API. We replicate that here.
-    print(f"\n  [Test B] Binding receiver to lounge session, then casttube …")
+    print("\n  [Test B] Binding receiver to lounge session, then casttube …")
     binding_messages = [
         # Format 1: remoteConnected — tells receiver a remote client has joined
-        {"type": "remoteConnected", "deviceName": "FamilyPlanner", "loungeToken": lounge_token},
+        {
+            "type": "remoteConnected",
+            "deviceName": "FamilyPlanner",
+            "loungeToken": lounge_token,
+        },
         # Format 2: setScreenId — some receivers expect this for session linking
         {"type": "setScreenId", "screenId": screen_id, "loungeToken": lounge_token},
     ]
@@ -416,7 +430,7 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
         yt_ctrl.send_message(msg)
         time.sleep(1)
 
-    print(f"  Sending play command via casttube …")
+    print("  Sending play command via casttube …")
     try:
         session = casttube.YouTubeSession(screen_id)
         session.play_video(video_id)
@@ -435,7 +449,9 @@ def _try_mdx_cast(target: object, video_id: str) -> bool:  # type: ignore[type-a
     return False
 
 
-def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None, use_oauth: bool = False) -> bool:  # type: ignore[type-arg]
+def _try_ytdlp_cast(
+    target: object, video_id: str, cookies_file: str | None, use_oauth: bool = False
+) -> bool:  # type: ignore[type-arg]
     """Attempt 2: yt-dlp stream extraction + local proxy + Default Media Receiver.
 
     Works for any content yt-dlp can access. NOT gapless for multi-track albums.
@@ -444,7 +460,9 @@ def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None, use
     print(f"\n{'─' * 60}")
     print("Approach 2: yt-dlp → local proxy → Default Media Receiver")
 
-    result = get_audio_stream_url(video_id, cookies_file=cookies_file, use_oauth=use_oauth)
+    result = get_audio_stream_url(
+        video_id, cookies_file=cookies_file, use_oauth=use_oauth
+    )
     if not result:
         print("  ERROR: yt-dlp could not extract a stream URL.")
         return False
@@ -458,6 +476,7 @@ def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None, use
 
     try:
         import urllib.request
+
         with urllib.request.urlopen(
             urllib.request.Request(proxy_url, method="HEAD"), timeout=5
         ) as r:
@@ -483,14 +502,22 @@ def _try_ytdlp_cast(target: object, video_id: str, cookies_file: str | None, use
     proxy.shutdown()
 
     if final == "PLAYING":
-        print("  ✓ Playing via Default Media Receiver (no gapless — single track only).")
+        print(
+            "  ✓ Playing via Default Media Receiver (no gapless — single track only)."
+        )
         return True
 
     print(f"  Final state: {final!r} — Approach 2 also failed.")
     return False
 
 
-def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookies_file: str | None = None, use_oauth: bool = False) -> None:  # type: ignore[type-arg]
+def cast_video(
+    chromecasts: list,
+    device_name: str | None,
+    video_id: str,
+    cookies_file: str | None = None,
+    use_oauth: bool = False,
+) -> None:  # type: ignore[type-arg]
     target = _pick_target(chromecasts, device_name)
     print(f"Connecting to '{target.cast_info.friendly_name}' …")
     target.wait()
@@ -506,18 +533,42 @@ def cast_video(chromecasts: list, device_name: str | None, video_id: str, cookie
 # Main
 # ---------------------------------------------------------------------------
 
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="YouTube Music + Google Cast POC",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("--query", default="TKKG", help="Show/artist to search (default: TKKG)")
-    parser.add_argument("--cast-name", metavar="NAME", help="Friendly name of the target Cast device")
-    parser.add_argument("--video-id", metavar="ID", help="Skip search; cast this YouTube video ID directly")
-    parser.add_argument("--no-cast", action="store_true", help="Browse and discover only; never cast")
-    parser.add_argument("--timeout", type=int, default=8, help="mDNS discovery timeout in seconds (default: 8)")
-    parser.add_argument("--cookies", metavar="FILE", help="Netscape cookies file for YouTube Premium content")
-    parser.add_argument("--oauth", action="store_true", help="Use yt-dlp OAuth2 token cache (~/.cache/yt-dlp/)")
+    parser.add_argument(
+        "--query", default="TKKG", help="Show/artist to search (default: TKKG)"
+    )
+    parser.add_argument(
+        "--cast-name", metavar="NAME", help="Friendly name of the target Cast device"
+    )
+    parser.add_argument(
+        "--video-id",
+        metavar="ID",
+        help="Skip search; cast this YouTube video ID directly",
+    )
+    parser.add_argument(
+        "--no-cast", action="store_true", help="Browse and discover only; never cast"
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=8,
+        help="mDNS discovery timeout in seconds (default: 8)",
+    )
+    parser.add_argument(
+        "--cookies",
+        metavar="FILE",
+        help="Netscape cookies file for YouTube Premium content",
+    )
+    parser.add_argument(
+        "--oauth",
+        action="store_true",
+        help="Use yt-dlp OAuth2 token cache (~/.cache/yt-dlp/)",
+    )
     args = parser.parse_args()
 
     # Step 1: browse content
@@ -535,7 +586,9 @@ def main() -> None:
             return
 
         if not video_id:
-            print("\nNo video ID to cast — rerun with --video-id <id> to test casting manually.")
+            print(
+                "\nNo video ID to cast — rerun with --video-id <id> to test casting manually."
+            )
             return
 
         if not chromecasts:
@@ -545,12 +598,19 @@ def main() -> None:
         print(f"\nReady to cast video {video_id!r} to a Cast device.")
         confirm = input("Proceed? [y/N] ").strip().lower()
         if confirm == "y":
-            cast_video(chromecasts, args.cast_name, video_id, cookies_file=args.cookies, use_oauth=args.oauth)
+            cast_video(
+                chromecasts,
+                args.cast_name,
+                video_id,
+                cookies_file=args.cookies,
+                use_oauth=args.oauth,
+            )
         else:
             print("Skipped.")
     finally:
         if browser is not None:
             import pychromecast.discovery
+
             pychromecast.discovery.stop_discovery(browser)
 
 
