@@ -62,7 +62,7 @@ def browse_music(query: str) -> str | None:
             podcast = (ep.get("podcast") or {}).get("name") or "?"
             print(f"  {vid}  {title!r}  (podcast: {podcast})")
             if first_video_id is None and vid != "—":
-                first_video_id = vid
+                first_video_id = str(vid)
     except Exception as e:
         print(f"  episodes search failed: {e}")
 
@@ -80,6 +80,7 @@ def browse_music(query: str) -> str | None:
 
     # --- Albums (e.g. audio dramas sold as albums: Benjamin Blümchen) ---
     print("\n[albums]")
+    first_album_track_id: str | None = None
     try:
         albums = yt.search(query, filter="albums", limit=5)
         for a in albums:
@@ -87,8 +88,26 @@ def browse_music(query: str) -> str | None:
             title = a.get("title") or "?"
             artist = ((a.get("artists") or [{}])[0]).get("name") or "?"
             print(f"  browseId={browse_id}  {title!r}  by {artist}")
+            if browse_id != "—":
+                try:
+                    album_data: dict[str, object] = yt.get_album(browse_id)  # type: ignore[assignment]
+                    tracks: list[dict[str, object]] = (album_data.get("tracks") or [])[:5]  # type: ignore[assignment]
+                    for t in tracks:  # type: ignore[union-attr]
+                        track: dict[str, object] = t  # type: ignore[assignment]
+                        vid = str(track.get("videoId") or "—")
+                        tname = str(track.get("title") or "?")
+                        dur = str(track.get("duration") or "?")
+                        print(f"    track  {vid}  {tname!r}  ({dur})")
+                        if first_album_track_id is None and vid != "—":
+                            first_album_track_id = vid
+                except Exception as ae:
+                    print(f"    (could not fetch tracks: {ae})")
     except Exception as e:
         print(f"  albums search failed: {e}")
+
+    if first_album_track_id and first_video_id is None:
+        first_video_id = first_album_track_id
+        print(f"\n→ Using first album track as castable ID: {first_video_id}")
 
     # --- Artists (then you'd drill into albums/episodes) ---
     print("\n[artists]")
@@ -244,8 +263,8 @@ def get_audio_stream_url(
         # bestaudio* matches any audio-only DASH stream (needed for Premium/Music content).
         # Fall back to best combined stream if nothing audio-only is found.
         "format": "bestaudio*[ext=m4a]/bestaudio*/bestaudio/best",
-        "quiet": True,
-        "no_warnings": True,
+        "quiet": False,   # verbose so format errors show available formats
+        "no_warnings": False,
     }
     if use_oauth:
         ydl_opts["username"] = "oauth2"
@@ -253,7 +272,8 @@ def get_audio_stream_url(
     elif cookies_file:
         ydl_opts["cookiefile"] = cookies_file
 
-    url = f"https://www.youtube.com/watch?v={video_id}"
+    # music.youtube.com is required for Premium-exclusive tracks (album audio books etc.)
+    url = f"https://music.youtube.com/watch?v={video_id}"
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
