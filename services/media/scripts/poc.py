@@ -3,7 +3,7 @@
 # dependencies = [
 #   "ytmusicapi>=1.8",
 #   "pychromecast>=14.0",
-#   "yt-dlp>=2025.1.1",
+#   "yt-dlp[default]>=2025.1.1",
 #   "casttube>=0.2.0",
 #   "requests>=2.32",
 # ]
@@ -263,8 +263,10 @@ def get_audio_stream_url(
         # bestaudio* matches any audio-only DASH stream (needed for Premium/Music content).
         # Fall back to best combined stream if nothing audio-only is found.
         "format": "bestaudio*[ext=m4a]/bestaudio*/bestaudio/best",
-        "quiet": False,   # verbose so format errors show available formats
+        "quiet": False,
         "no_warnings": False,
+        # EJS challenge solver — requires yt-dlp[default] and node installed.
+        "js_runtime": "node",
     }
     if use_oauth:
         ydl_opts["username"] = "oauth2"
