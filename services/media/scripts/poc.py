@@ -247,6 +247,21 @@ def _pick_target(chromecasts: list, device_name: str | None):  # type: ignore[ty
     return chromecasts[0]
 
 
+def _patch_path_for_node() -> None:
+    """Ensure node is findable by yt-dlp — uv creates subprocesses with a stripped PATH."""
+    import os
+    import shutil
+
+    if shutil.which("node"):
+        return
+    for candidate in ("/usr/bin", "/usr/local/bin", "/usr/local/sbin"):
+        if os.path.isfile(os.path.join(candidate, "node")):
+            os.environ["PATH"] = candidate + ":" + os.environ.get("PATH", "")
+            print(f"  [node] added {candidate} to PATH for EJS challenge solver")
+            return
+    print("  WARNING: node not found in PATH — EJS challenge solving will fail")
+
+
 def get_audio_stream_url(
     video_id: str,
     cookies_file: str | None = None,
@@ -256,21 +271,21 @@ def get_audio_stream_url(
 
     Returns (url, content_type) or None on failure.
 
-    Auth options (pick one):
-      use_oauth=True  — uses the cached OAuth2 token in ~/.cache/yt-dlp/.
-                        Run once to set up: uv run yt-dlp --username oauth2 --password '' <url>
-      cookies_file    — path to a Netscape-format cookies file from your browser.
+    Auth: pass a Netscape-format cookies file from a browser signed into YouTube Premium.
     """
     import yt_dlp  # type: ignore[import-untyped]
 
-    ydl_opts: dict = {
+    # uv spawns Python with a stripped PATH — node won't be detected without this.
+    _patch_path_for_node()
+
+    ydl_opts: dict[str, object] = {
         # bestaudio* matches any audio-only DASH stream (needed for Premium/Music content).
-        # Fall back to best combined stream if nothing audio-only is found.
         "format": "bestaudio*[ext=m4a]/bestaudio*/bestaudio/best",
         "quiet": False,
         "no_warnings": False,
-        # EJS challenge solver — requires yt-dlp[default] and node installed.
-        "js_runtime": "node",
+        # js_runtimes (plural dict) is what yt-dlp's internal runtime selector reads.
+        # js_runtime (singular) is the CLI-arg name and gets stored in params but ignored by EJS.
+        "js_runtimes": {"node": {}},
         "verbose": True,
     }
     if use_oauth:
@@ -282,7 +297,7 @@ def get_audio_stream_url(
     # music.youtube.com is required for Premium-exclusive tracks (album audio books etc.)
     url = f"https://music.youtube.com/watch?v={video_id}"
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:  # type: ignore[arg-type]
             info = ydl.extract_info(url, download=False)
             if not info:
                 return None
