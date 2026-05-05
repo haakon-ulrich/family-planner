@@ -241,7 +241,9 @@ def get_audio_stream_url(
     import yt_dlp  # type: ignore[import-untyped]
 
     ydl_opts: dict = {
-        "format": "bestaudio[ext=m4a]/bestaudio/best",
+        # bestaudio* matches any audio-only DASH stream (needed for Premium/Music content).
+        # Fall back to best combined stream if nothing audio-only is found.
+        "format": "bestaudio*[ext=m4a]/bestaudio*/bestaudio/best",
         "quiet": True,
         "no_warnings": True,
     }
@@ -259,7 +261,9 @@ def get_audio_stream_url(
                 return None
             stream_url: str = info["url"]
             ext: str = info.get("ext", "m4a")
-            # Map extension to MIME type the Cast default receiver accepts
+            fmt_id: str = info.get("format_id", "?")
+            abr: float | None = info.get("abr")
+            print(f"  yt-dlp selected format: {fmt_id}  ext={ext}  abr={abr}kbps")
             mime = {"m4a": "audio/mp4", "webm": "audio/webm", "mp3": "audio/mpeg"}.get(ext, "audio/mp4")
             return stream_url, mime
     except Exception as exc:
