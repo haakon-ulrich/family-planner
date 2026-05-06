@@ -97,6 +97,56 @@ def start_session(
     return _session
 
 
+def build_ffmpeg_args(stream_urls: list[str]) -> list[str]:
+    n = len(stream_urls)
+    args = ["ffmpeg", "-loglevel", "error"]
+    for url in stream_urls:
+        args += ["-i", url]
+    if n > 1:
+        inputs = "".join(f"[{i}:a]" for i in range(n))
+        args += [
+            "-filter_complex", f"{inputs}concat=n={n}:v=0:a=1[out]",
+            "-map", "[out]",
+        ]
+    args += ["-c:a", "libmp3lame", "-b:a", "192k", "-f", "mp3", "pipe:1"]
+    return args
+
+
+async def open_ffmpeg_stream() -> asyncio.StreamReader:
+    session = get_active_session()
+    if session is None:
+        raise RuntimeError("No active session")
+    if session.ffmpeg_process is not None:
+        try:
+            session.ffmpeg_process.kill()
+        except Exception:
+            pass
+        session.ffmpeg_process = None
+
+    args = build_ffmpeg_args(session.stream_urls)
+    logger.info("Starting ffmpeg: %d track(s)", len(session.stream_urls))
+    proc = await asyncio.create_subprocess_exec(
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    session.ffmpeg_process = proc
+    assert proc.stdout is not None
+    return proc.stdout
+
+
+def kill_ffmpeg() -> None:
+    """Kill the ffmpeg process on the active session without stopping the session."""
+    if _session is None or _session.ffmpeg_process is None:
+        return
+    try:
+        _session.ffmpeg_process.kill()
+        logger.info("ffmpeg process killed (client disconnect)")
+    except Exception as exc:
+        logger.warning("Could not kill ffmpeg: %s", exc)
+    _session.ffmpeg_process = None
+
+
 def stop_session() -> None:
     global _session
     if _session is None:

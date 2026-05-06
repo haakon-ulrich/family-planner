@@ -1,8 +1,7 @@
 import logging
-import urllib.request
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from services import playback_service
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/stream")
-async def stream(request: Request) -> StreamingResponse:
+async def stream() -> StreamingResponse:
     session = playback_service.get_active_session()
     if session is None:
         raise HTTPException(
@@ -20,48 +19,24 @@ async def stream(request: Request) -> StreamingResponse:
             detail={"code": "NO_SESSION", "message": "No active playback session"},
         )
 
-    # Use the first track's stream URL. When we add ffmpeg later this endpoint
-    # will pipe the concat stream instead.
-    stream_url = session.stream_urls[0]
-    range_header = request.headers.get("range")
-
-    headers: dict[str, str] = {"User-Agent": "Mozilla/5.0"}
-    if range_header:
-        headers["Range"] = range_header
-
-    req = urllib.request.Request(stream_url, headers=headers)
     try:
-        upstream = urllib.request.urlopen(req, timeout=30)
+        reader = await playback_service.open_ffmpeg_stream()
     except Exception as exc:
-        logger.error("Failed to open upstream stream: %s", exc)
+        logger.error("Failed to start ffmpeg: %s", exc)
         raise HTTPException(
             status_code=503,
-            detail={"code": "STREAM_ERROR", "message": str(exc)},
+            detail={"code": "FFMPEG_ERROR", "message": str(exc)},
         ) from exc
 
-    upstream_status: int = upstream.status
-    content_type: str = upstream.headers.get("Content-Type") or "audio/mp4"
-
-    response_headers: dict[str, str] = {"Accept-Ranges": "bytes"}
-    for h in ("Content-Length", "Content-Range"):
-        val = upstream.headers.get(h)
-        if val:
-            response_headers[h] = val
-
-    def _generate() -> Generator[bytes, None, None]:
+    async def _generate() -> AsyncGenerator[bytes, None]:
         try:
-            with upstream:
-                while True:
-                    chunk: bytes = upstream.read(65536)
-                    if not chunk:
-                        break
-                    yield chunk
-        except Exception as exc:
-            logger.debug("Stream generator stopped: %s", exc)
+            while True:
+                chunk = await reader.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+        finally:
+            # Runs on normal end-of-stream and on client disconnect.
+            playback_service.kill_ffmpeg()
 
-    return StreamingResponse(
-        _generate(),
-        status_code=upstream_status,
-        media_type=content_type,
-        headers=response_headers,
-    )
+    return StreamingResponse(_generate(), media_type="audio/mpeg")
