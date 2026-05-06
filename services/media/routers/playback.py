@@ -51,7 +51,7 @@ async def play(req: PlayRequest) -> PlayResponse:
 
     # Build the stream URL that the Cast device will fetch from this sidecar.
     local_ip = cast_service.local_ip_toward(device.cast_info.host)
-    sidecar_stream_url = f"http://{local_ip}:{settings.sidecar_port}/stream"
+    sidecar_stream_url = f"http://{local_ip}:{settings.media_sidecar_port}/stream"
 
     # Send the Cast command (blocking, but fast — just sends a Cast protocol message).
     loop = asyncio.get_running_loop()

@@ -282,7 +282,7 @@ Owns the playback session, yt-dlp extraction, and ffmpeg lifecycle.
 `services/media/.env`:
 
 ```
-SIDECAR_PORT=3002
+MEDIA_SIDECAR_PORT=3002
 CAST_DEVICE_NAME=Living Room speaker   # friendly name as shown in Google Home app
 YTDLP_COOKIES_FILE=/path/to/yt-cookies.txt  # Netscape cookies exported from browser
 MEDIA_DATA_DIR=./data

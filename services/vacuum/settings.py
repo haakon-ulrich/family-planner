@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     roborock_username: str
     roborock_password: SecretStr
     roborock_device_id: str | None = None
-    sidecar_port: int = 3001
+    vacuum_sidecar_port: int = 3001
     vacuum_data_dir: Path = Path("./data")
 
 

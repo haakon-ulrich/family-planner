@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Vacuum sidecar starting on port %d", settings.sidecar_port)
+    logger.info("Vacuum sidecar starting on port %d", settings.vacuum_sidecar_port)
     await start()
     yield
     await vacuum_stop()
@@ -43,4 +43,4 @@ async def health() -> HealthResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=settings.sidecar_port)
+    uvicorn.run(app, host="0.0.0.0", port=settings.vacuum_sidecar_port)

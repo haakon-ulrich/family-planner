@@ -3,7 +3,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-
 from models import HealthData, HealthResponse
 from routers.catalog import router as catalog_router
 from routers.playback import router as playback_router
@@ -19,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    logger.info("Media sidecar starting on port %d", settings.sidecar_port)
+    logger.info("Media sidecar starting on port %d", settings.media_sidecar_port)
     yield
     logger.info("Media sidecar stopped")
 
@@ -38,4 +37,4 @@ async def health() -> HealthResponse:
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run(app, host="0.0.0.0", port=settings.sidecar_port)
+    uvicorn.run(app, host="0.0.0.0", port=settings.media_sidecar_port)

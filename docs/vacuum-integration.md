@@ -302,7 +302,7 @@ Sidecar credentials live in `services/vacuum/.env` (not committed; `.env.example
 ROBOROCK_USERNAME=your@email.com
 ROBOROCK_PASSWORD="yourpassword"   # quote if the password contains # or spaces
 ROBOROCK_DEVICE_ID=5J4rMD1fkuE0S58DJKBc8C  # serial (duid) — required if account has multiple devices
-SIDECAR_PORT=3001
+VACUUM_SIDECAR_PORT=3001
 ```
 
 **Auth token cache:** On first startup the sidecar performs the full login flow (password + 2-step email code entered interactively on the terminal). The resulting `UserData` tokens are serialised to `services/vacuum/data/auth_cache.json`. On every subsequent restart the sidecar loads the cache and reconnects without any user interaction. The cache file must be excluded from version control (`.gitignore`) and backed up with the SQLite DB.
