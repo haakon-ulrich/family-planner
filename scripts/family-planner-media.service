@@ -1,0 +1,26 @@
+[Unit]
+Description=Family Planner media sidecar
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=family-planner
+Group=family-planner
+WorkingDirectory=/opt/family-planner/services/media
+EnvironmentFile=/etc/family-planner/.env
+ExecStart=/opt/family-planner/services/media/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=family-planner-media
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/family-planner/media
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

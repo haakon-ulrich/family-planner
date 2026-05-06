@@ -21,12 +21,18 @@ npm run build
 echo "==> Syncing vacuum sidecar dependencies..."
 cd "$APP_DIR/services/vacuum"
 uv sync
+cd "$APP_DIR"
+
+echo "==> Syncing media sidecar dependencies..."
+cd "$APP_DIR/services/media"
+uv sync
 chmod -R a+rX /root/.local/share/uv/python/
 cd "$APP_DIR"
 
 echo "==> Restarting services..."
 systemctl restart family-planner
 systemctl restart family-planner-vacuum
-systemctl status family-planner family-planner-vacuum --no-pager
+systemctl restart family-planner-media
+systemctl status family-planner family-planner-vacuum family-planner-media --no-pager
 
 echo "==> Done."

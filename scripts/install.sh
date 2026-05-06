@@ -25,7 +25,8 @@ apt-get install -y --no-install-recommends \
   curl \
   sway \
   chromium \
-  fonts-noto-color-emoji
+  fonts-noto-color-emoji \
+  ffmpeg
 
 # ── 2. Node.js LTS (NodeSource) ───────────────────────────────────────────────
 if ! command -v node &>/dev/null; then
@@ -138,7 +139,38 @@ systemctl enable family-planner-vacuum
 # Service is NOT started here — Roborock auth setup must run first (see Next steps)
 echo "==> family-planner-vacuum.service installed (not started)"
 
-# ── 14. Kiosk autologin on tty1 ──────────────────────────────────────────────
+# ── 14. Media sidecar Python venv ─────────────────────────────────────────────
+echo "==> Setting up media sidecar Python venv..."
+cd "$APP_DIR/services/media"
+uv sync
+chmod -R a+rX /root/.local/share/uv/python/
+cd "$APP_DIR"
+
+# ── 15. Media data directory and env ──────────────────────────────────────────
+MEDIA_DATA_DIR=/var/lib/family-planner/media
+echo "==> Creating media data directory: $MEDIA_DATA_DIR"
+mkdir -p "$MEDIA_DATA_DIR"
+chown "$SERVICE_USER:$SERVICE_USER" "$MEDIA_DATA_DIR"
+chmod 750 "$MEDIA_DATA_DIR"
+
+if ! grep -q "^MEDIA_DATA_DIR=" "$ENV_FILE" 2>/dev/null; then
+  cat >> "$ENV_FILE" << MEDIA_ENV
+MEDIA_DATA_DIR=$MEDIA_DATA_DIR
+YTDLP_COOKIES_FILE=$MEDIA_DATA_DIR/yt-cookies.txt
+CAST_DEVICE_NAME=Living Room speaker
+MEDIA_SIDECAR_PORT=3002
+MEDIA_ENV
+fi
+
+# ── 16. Media sidecar systemd service ─────────────────────────────────────────
+echo "==> Installing media sidecar service..."
+cp "$APP_DIR/scripts/family-planner-media.service" /etc/systemd/system/family-planner-media.service
+systemctl daemon-reload
+systemctl enable family-planner-media
+# Service is NOT started here — yt-cookies.txt and artists.json must be in place first
+echo "==> family-planner-media.service installed (not started)"
+
+# ── 17. Kiosk autologin on tty1 ──────────────────────────────────────────────
 echo "==> Configuring kiosk autologin..."
 mkdir -p /etc/systemd/system/getty@tty1.service.d
 cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
@@ -219,10 +251,20 @@ echo "       .venv/bin/python scripts/setup_auth.py"
 echo "     '"
 echo ""
 echo "  4. Start the vacuum sidecar:  sudo systemctl start family-planner-vacuum"
-echo "  5. Reboot for kiosk:          sudo reboot"
+echo ""
+echo "  5. Set up the media sidecar:"
+echo "     a. Copy yt-cookies.txt to /var/lib/family-planner/media/yt-cookies.txt"
+echo "     b. Copy artists.json to /var/lib/family-planner/media/artists.json"
+echo "     c. Fix permissions: sudo chown -R family-planner:family-planner /var/lib/family-planner/media"
+echo "     d. Edit CAST_DEVICE_NAME in $ENV_FILE if needed"
+echo "     e. Start the service: sudo systemctl start family-planner-media"
+echo ""
+echo "  6. Reboot for kiosk:          sudo reboot"
 echo ""
 echo "  Useful commands:"
 echo "    sudo journalctl -u family-planner -f          # backend logs"
 echo "    sudo journalctl -u family-planner-vacuum -f   # vacuum sidecar logs"
+echo "    sudo journalctl -u family-planner-media -f    # media sidecar logs"
 echo "    sudo systemctl status family-planner          # service status"
 echo "    sudo systemctl status family-planner-vacuum   # sidecar status"
+echo "    sudo systemctl status family-planner-media    # media sidecar status"
