@@ -404,28 +404,85 @@ sudo apt install -y ffmpeg
 
 ### Routes
 
-- `/media` — artist grid (hardcoded list, tap to enter artist)
-- `/media/:artistId` — album list for artist (tap to play)
+A single route: `/media`. There is no nested route for albums — the album view is an in-page panel, not a navigation. Selected artist is held in the Zustand store (cleared on unmount). Navigation icon: music note, positioned above the vacuum icon in the sidebar.
 
-A persistent `PlayerBar` at the bottom of both routes shows current playback state and pause/resume/stop controls. It is always visible while `state !== "idle"`.
+### Layout — `/media`
+
+```
+┌─────────────────────────────────────────────────────┐
+│  Left 1/3 (fixed, scrolls independently)            │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ 🖼  Benjamin Blümchen                        │   │  ← selected
+│  │ 🖼  Paw Patrol                               │   │
+│  │ 🖼  TKKG                                     │   │
+│  │ 🖼  Was Ist Was                              │   │
+│  └──────────────────────────────────────────────┘   │
+│  Right 2/3                                          │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ [NOW PLAYING — visible only when state≠idle] │   │
+│  │  🖼 album thumb │  album title  ⏸/▶   ⏹    │   │
+│  └──────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────┐   │
+│  │ Album grid (responsive columns)              │   │
+│  │  🖼  🖼  🖼  🖼                               │   │
+│  │  T   T   T   T                               │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+```
+
+**Artist list (left panel)**
+- Alphabetical order, one artist per row: thumbnail (~64 px square) + name
+- Tapping selects the artist and loads albums on the right; selected row highlighted
+- Scrolls independently of the right panel
+
+**Album grid (right panel)**
+- Responsive column count based on available width
+- Each cell: square thumbnail, title underneath
+- Tapping an album calls `POST /play` and shows a loading spinner inside that cell until the response returns (~5–15 s); other albums remain visible but no second tap is accepted while one is loading
+
+**Now playing bar (right panel, top)**
+- Visible only when `status.state !== "idle"`
+- Left: album thumbnail + title; Right: pause/resume toggle + stop button
+- Pause/resume is optimistic — flip state immediately, revert on error
+
+### Layout — Dashboard mini-player
+
+Rendered at the top of the calendar column, above the day's task list. Visible only when `status.state !== "idle"`.
+
+```
+┌──────────────────────────────────────────┐
+│ 🖼 (cropped) │ Album title    ⏸/▶   ⏹  │
+└──────────────────────────────────────────┘
+```
+
+- Thumbnail is `object-cover` cropped to keep strip height small (~56 px)
+- Pause/resume toggle + stop button; no album selection from here
+- Implemented as a component in the existing dashboard layout
 
 ### TanStack Query keys
 
 ```ts
-["media", "artists"]                   // artist list (stable, long cache)
-["media", "albums", artistBrowseId]    // album list per artist (10 min cache)
-["media", "status"]                    // playback status, polled every 5s
+["media", "artists"]                   // artist list (stable, no background refetch)
+["media", "albums", artistId]          // album list per artist (10 min cache)
+["media", "status"]                    // playback status, polled every 5 s
 ```
 
 On `POST /play` success, invalidate `["media", "status"]` immediately.
 
+### Zustand store (`media/store.ts`)
+
+```ts
+selectedArtistId: string | null        // which artist's albums are shown
+loadingAlbumBrowseId: string | null    // which album cell shows a spinner
+```
+
 ### Playback flow
 
-1. User taps artist → navigate to `/media/:id`, fetch albums.
-2. User taps album → `POST /play` with `album_browse_id`.
-3. Loading state while sidecar extracts URLs and connects to Cast device (~3–8 s).
-4. On success, `PlayerBar` appears with pause/stop controls.
-5. Pause/resume/stop call their respective endpoints, optimistic UI updates `status`.
+1. User taps artist → `selectedArtistId` set, album grid loads.
+2. User taps album → `loadingAlbumBrowseId` set, `POST /play` called.
+3. On response, `loadingAlbumBrowseId` cleared; on success `["media", "status"]` invalidated.
+4. Status poll (every 5 s) picks up new state; now playing bar appears on media page and dashboard.
+5. Pause/resume/stop update status optimistically and call their respective endpoints.
 
 ---
 

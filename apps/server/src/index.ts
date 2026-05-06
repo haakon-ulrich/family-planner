@@ -28,6 +28,7 @@ import calendarRouter from '@server/routes/calendar';
 import weatherRouter from '@server/routes/weather';
 import streaksRouter from '@server/routes/streaks';
 import vacuumRouter from '@server/routes/vacuum';
+import mediaRouter from '@server/routes/media';
 
 const migrationsFolder = path.join(path.dirname(fileURLToPath(import.meta.url)), '../drizzle');
 
@@ -76,6 +77,7 @@ app.route('/api/calendar', calendarRouter);
 app.route('/api/weather', weatherRouter);
 app.route('/api/streaks', streaksRouter);
 app.route('/api/vacuum', vacuumRouter);
+app.route('/api/media', mediaRouter);
 
 const publicDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
 if (existsSync(publicDir)) {

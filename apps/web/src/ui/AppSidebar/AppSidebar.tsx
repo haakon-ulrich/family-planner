@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListTodo, Server, Settings, Users } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Music, Server, Settings, Users } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import RobotVacuumIcon from '@web/ui/RobotVacuumIcon';
 
@@ -6,6 +6,7 @@ type NavItem = { to: string; icon: React.ReactNode; label: string };
 
 const TOP_NAV: NavItem[] = [
   { to: '/', icon: <LayoutDashboard className="w-6 h-6" />, label: 'Dashboard' },
+  { to: '/media', icon: <Music className="w-6 h-6" />, label: 'Musik' },
   { to: '/vacuum', icon: <RobotVacuumIcon className="w-6 h-6" />, label: 'Staubsauger' },
 ];
 

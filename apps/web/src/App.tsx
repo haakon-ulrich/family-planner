@@ -3,6 +3,7 @@ import AppLayout from '@web/ui/AppLayout'
 import { Dashboard } from '@web/features/dashboard'
 import { Admin, Family, Tasks, System } from '@web/features/admin'
 import { VacuumPage } from '@web/features/vacuum'
+import { MediaPage } from '@web/features/media'
 import useSseEvents from '@web/hooks/useSseEvents'
 import useQuietHours from '@web/hooks/useQuietHours'
 import { useKioskKeyboard } from '@web/hooks/useKioskKeyboard'
@@ -13,6 +14,7 @@ const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { path: '/', element: <Dashboard /> },
+      { path: '/media', element: <MediaPage /> },
       { path: '/vacuum', element: <VacuumPage /> },
       {
         path: '/admin',
