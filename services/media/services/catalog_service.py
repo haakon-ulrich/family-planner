@@ -161,13 +161,14 @@ def _fetch_albums(channel_id: str) -> list[Album]:
     return _parse_album_list(raw)
 
 
-def get_album_info(album_browse_id: str) -> tuple[str, list[str]]:
-    """Return (album_title, video_ids) from a single get_album() call."""
+def get_album_info(album_browse_id: str) -> tuple[str, str | None, list[str]]:
+    """Return (album_title, thumbnail_url, video_ids) from a single get_album() call."""
     album_data: dict[str, Any] = _get_yt().get_album(album_browse_id)
     title = str(album_data.get("title") or album_browse_id)
+    thumbnail_url = _best_thumbnail(album_data.get("thumbnails") or [])
     tracks: list[Any] = album_data.get("tracks") or []
     video_ids = [str(t["videoId"]) for t in tracks if t.get("videoId")]
-    return title, video_ids
+    return title, thumbnail_url, video_ids
 
 
 def _parse_album_list(raw: list[Any]) -> list[Album]:

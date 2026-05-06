@@ -48,6 +48,7 @@ class PlayResponse(BaseModel):
 class StatusData(BaseModel):
     state: str  # idle | playing | paused | stopped | error
     album_title: str | None
+    album_thumbnail_url: str | None
     device_name: str | None
 
 

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @router.post("/play")
 async def play(req: PlayRequest) -> PlayResponse:
     try:
-        album_title, video_ids = get_album_info(req.album_browse_id)
+        album_title, album_thumbnail_url, video_ids = get_album_info(req.album_browse_id)
     except Exception as exc:
         raise HTTPException(
             status_code=502,
@@ -66,7 +66,7 @@ async def play(req: PlayRequest) -> PlayResponse:
             detail={"code": "CAST_ERROR", "message": str(exc)},
         ) from exc
 
-    playback_service.start_session(album_title, video_ids, stream_urls, device)
+    playback_service.start_session(album_title, album_thumbnail_url, video_ids, stream_urls, device)
     logger.info("Playback started: %r → %s", album_title, sidecar_stream_url)
 
     return PlayResponse(
@@ -111,12 +111,13 @@ async def status() -> StatusResponse:
     session = playback_service.get_active_session()
     if session is None:
         return StatusResponse(
-            data=StatusData(state="idle", album_title=None, device_name=None)
+            data=StatusData(state="idle", album_title=None, album_thumbnail_url=None, device_name=None)
         )
     return StatusResponse(
         data=StatusData(
             state=session.state,
             album_title=session.album_title,
+            album_thumbnail_url=session.album_thumbnail_url,
             device_name=settings.cast_device_name,
         )
     )

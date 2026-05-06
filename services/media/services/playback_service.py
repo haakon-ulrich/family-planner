@@ -65,6 +65,7 @@ async def extract_stream_urls(video_ids: list[str]) -> list[str]:
 @dataclass
 class PlaybackSession:
     album_title: str
+    album_thumbnail_url: str | None
     track_video_ids: list[str]
     stream_urls: list[str]
     state: str = "playing"
@@ -81,6 +82,7 @@ def get_active_session() -> PlaybackSession | None:
 
 def start_session(
     album_title: str,
+    album_thumbnail_url: str | None,
     video_ids: list[str],
     stream_urls: list[str],
     cast_device: Any = None,
@@ -89,6 +91,7 @@ def start_session(
     stop_session()
     _session = PlaybackSession(
         album_title=album_title,
+        album_thumbnail_url=album_thumbnail_url,
         track_video_ids=video_ids,
         stream_urls=stream_urls,
         cast_device=cast_device,

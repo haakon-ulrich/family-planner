@@ -17,5 +17,6 @@ export type MediaState = 'idle' | 'playing' | 'paused' | 'stopped' | 'error';
 export type MediaStatus = {
   state: MediaState;
   album_title: string | null;
+  album_thumbnail_url: string | null;
   device_name: string | null;
 };
