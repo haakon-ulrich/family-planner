@@ -29,6 +29,7 @@ async def play(req: PlayRequest) -> PlayResponse:
     try:
         album_title, album_thumbnail_url, video_ids = get_album_info(req.album_browse_id)
     except Exception as exc:
+        logger.exception("get_album_info failed")
         raise HTTPException(
             status_code=502,
             detail={"code": "YTMUSIC_ERROR", "message": str(exc)},
@@ -47,6 +48,7 @@ async def play(req: PlayRequest) -> PlayResponse:
             cast_service.get_device(settings.cast_device_name),
         )
     except Exception as exc:
+        logger.exception("URL extraction or Cast discovery failed")
         cast_service.invalidate()
         raise HTTPException(
             status_code=503,
@@ -64,6 +66,7 @@ async def play(req: PlayRequest) -> PlayResponse:
             None, cast_service.play_stream, device, sidecar_stream_url
         )
     except Exception as exc:
+        logger.exception("play_stream failed")
         cast_service.invalidate()
         raise HTTPException(
             status_code=503,
