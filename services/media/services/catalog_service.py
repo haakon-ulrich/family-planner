@@ -166,6 +166,7 @@ def get_album_info(album_browse_id: str) -> tuple[str, str | None, list[str]]:
     album_data: dict[str, Any] = _get_yt().get_album(album_browse_id)
     title = str(album_data.get("title") or album_browse_id)
     thumbnail_url = _best_thumbnail(album_data.get("thumbnails") or [])
+    logger.info("get_album_info %r: thumbnail_url=%r", title, thumbnail_url)
     tracks: list[Any] = album_data.get("tracks") or []
     video_ids = [str(t["videoId"]) for t in tracks if t.get("videoId")]
     return title, thumbnail_url, video_ids
@@ -182,14 +183,15 @@ def _parse_album_list(raw: list[Any]) -> list[Album]:
                 browse_id=browse_id,
                 title=str(a.get("title") or "?"),
                 year=str(a["year"]) if a.get("year") else None,
-                thumbnail_url=_best_thumbnail(a.get("thumbnails") or []),
+                thumbnail_url=_best_thumbnail(a.get("thumbnails") or []) or "",
                 track_count=None,
             )
         )
     return albums
 
 
-def _best_thumbnail(thumbnails: list[Any]) -> str:
+def _best_thumbnail(thumbnails: list[Any]) -> str | None:
     if not thumbnails:
-        return ""
-    return str(thumbnails[-1].get("url") or "")
+        return None
+    url = thumbnails[-1].get("url")
+    return str(url) if url else None

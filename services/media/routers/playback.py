@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 @router.post("/play")
 async def play(req: PlayRequest) -> PlayResponse:
+    # Stop any active session before starting a new one so we don't quit the cast app
+    # after play_stream has already sent the new play command to the same device.
+    playback_service.stop_session()
+
     try:
         album_title, album_thumbnail_url, video_ids = get_album_info(req.album_browse_id)
     except Exception as exc:
