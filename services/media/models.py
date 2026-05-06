@@ -29,3 +29,35 @@ class ArtistsResponse(BaseModel):
 
 class AlbumsResponse(BaseModel):
     data: list[Album]
+
+
+class PlayRequest(BaseModel):
+    album_browse_id: str
+
+
+class PlayData(BaseModel):
+    ok: bool
+    album_title: str
+    track_count: int
+
+
+class PlayResponse(BaseModel):
+    data: PlayData
+
+
+class StatusData(BaseModel):
+    state: str  # idle | playing | paused | stopped | error
+    album_title: str | None
+    device_name: str | None
+
+
+class StatusResponse(BaseModel):
+    data: StatusData
+
+
+class OkData(BaseModel):
+    ok: bool
+
+
+class OkResponse(BaseModel):
+    data: OkData

@@ -6,6 +6,8 @@ from fastapi import FastAPI
 
 from models import HealthData, HealthResponse
 from routers.catalog import router as catalog_router
+from routers.playback import router as playback_router
+from routers.stream import router as stream_router
 from settings import settings
 
 logging.basicConfig(
@@ -24,6 +26,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(title="Media Sidecar", lifespan=lifespan)
 app.include_router(catalog_router)
+app.include_router(playback_router)
+app.include_router(stream_router)
 
 
 @app.get("/health")

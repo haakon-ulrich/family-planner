@@ -6,7 +6,7 @@ interface MemberHeaderRowProps {
 }
 
 const MemberHeaderRow = ({ members }: MemberHeaderRowProps) => (
-  <div className="flex flex-none">
+  <div className="flex flex-none sticky top-0 z-10 bg-slate-900">
     {members.map((member, i) => (
       <div
         key={member.id}

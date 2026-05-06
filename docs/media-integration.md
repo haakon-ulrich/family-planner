@@ -66,8 +66,8 @@ A Python sidecar on the Pi exposes a REST API on `localhost:3002`. The Hono back
 
 - **Language:** Python 3.14 (managed via uv), matching the vacuum sidecar
 - **Framework:** FastAPI + uvicorn
-- **Content browsing:** `ytmusicapi` (unauthenticated for metadata)
-- **Stream extraction:** `yt-dlp` with OAuth2 credentials for YouTube Premium content
+- **Content browsing:** `ytmusicapi` authenticated via Netscape cookies file (unauthenticated returns only a 5-item shelf preview — not the full catalogue)
+- **Stream extraction:** `yt-dlp[default]` (includes EJS challenge solver) with Netscape cookies file for YouTube Premium content; Node.js must be in PATH for EJS solver
 - **Audio pipeline:** `ffmpeg` system binary — concatenates track streams into one continuous MP3 output
 - **Cast control:** `pychromecast` — discovers the Home Mini, issues `play_media`, `pause`, `play`, `stop`
 - **Dependency manager:** uv
@@ -138,7 +138,7 @@ Returns the hardcoded artist list from `data/artists.json`.
 {
   "data": [
     {
-      "id": "MPLAUC...",
+      "id": "UCxxxxxxxxxxxxxxxxxxxxxx",
       "name": "TKKG",
       "thumbnail_url": "https://lh3.googleusercontent.com/..."
     }
@@ -146,11 +146,11 @@ Returns the hardcoded artist list from `data/artists.json`.
 }
 ```
 
-`id` is the YouTube Music artist browse ID. `thumbnail_url` is served from Google's CDN and used directly in `<img>` tags.
+`id` is the YouTube channel ID (format `UC…`), found in the URL of the artist's page at `music.youtube.com/channel/UC…`. `thumbnail_url` is served from Google's CDN and used directly in `<img>` tags.
 
-### `GET /artists/{browse_id}/albums`
+### `GET /artists/{artist_id}/albums`
 
-Calls `ytmusicapi.get_artist(browse_id)` and returns the artist's album list. Albums are ordered as ytmusicapi returns them (newest first).
+Calls `ytmusicapi.get_artist(artist_id)` to get the shelf and full-listing params, then `get_artist_albums(browseId, params, limit=500)` for the complete discography. Albums are ordered as ytmusicapi returns them (newest first).
 
 ```json
 {
@@ -160,11 +160,13 @@ Calls `ytmusicapi.get_artist(browse_id)` and returns the artist's album list. Al
       "title": "TKKG 1 – Freddy, fass!",
       "year": "1998",
       "thumbnail_url": "https://lh3.googleusercontent.com/...",
-      "track_count": 4
+      "track_count": null
     }
   ]
 }
 ```
+
+`track_count` is always `null` — ytmusicapi does not return track counts from the discography listing; they are only available via `get_album()`.
 
 Cached for 10 minutes in memory — artist catalogues don't change often.
 
@@ -247,11 +249,11 @@ The audio stream endpoint. Called directly by the Cast device, not by the fronte
 
 Owns ytmusicapi interaction and the artist catalogue.
 
-- `get_artists() -> list[Artist]` — reads `data/artists.json`, enriches with ytmusicapi thumbnail if not already cached
-- `get_albums(browse_id: str) -> list[Album]` — calls `yt.get_artist(browse_id)`, caches result for 10 min
+- `get_artists() -> list[Artist]` — reads `data/artists.json`
+- `get_albums(artist: Artist) -> list[Album]` — calls `get_artist(artist.id)` then `get_artist_albums(browseId, params, limit=500)` for the full discography; caches result per artist for 10 min
 - `get_track_ids(album_browse_id: str) -> list[str]` — calls `yt.get_album(browse_id)`, returns ordered video IDs
 
-`YTMusic()` is instantiated unauthenticated — metadata browsing does not require login.
+`YTMusic()` is initialised lazily on the first request and **must** be authenticated. The authentication helper reads the Netscape cookies file, extracts the relevant YouTube cookies, computes a SAPISIDHASH from `__Secure-3PAPISID`, and writes a ytmusicapi browser-auth JSON (including `X-Origin: https://music.youtube.com`, which ytmusicapi needs to recompute fresh SAPISIDHASHes per request). Without authentication, `get_artist_albums()` returns only the 5-item shelf preview.
 
 ### 4.2 `services/cast_service.py`
 
@@ -280,11 +282,13 @@ Owns the playback session, yt-dlp extraction, and ffmpeg lifecycle.
 `services/media/.env`:
 
 ```
-MEDIA_SIDECAR_PORT=3002
+SIDECAR_PORT=3002
 CAST_DEVICE_NAME=Living Room speaker   # friendly name as shown in Google Home app
-YTDLP_USE_OAUTH=true                   # use ~/.cache/yt-dlp/ OAuth2 token cache
-YTDLP_COOKIES_FILE=                    # alternative: path to Netscape cookies file
+YTDLP_COOKIES_FILE=/path/to/yt-cookies.txt  # Netscape cookies exported from browser
+MEDIA_DATA_DIR=./data
 ```
+
+Both `ytmusicapi` and `yt-dlp` use the same Netscape cookies file. Export it from Chrome/Firefox with a cookies extension (e.g. "Get cookies.txt LOCALLY") while signed into the YouTube Premium account.
 
 `apps/server/.env` gains one variable:
 
@@ -294,20 +298,9 @@ MEDIA_SIDECAR_URL=http://localhost:3002
 
 If `MEDIA_SIDECAR_URL` is not set, Hono skips registering the `/api/media/*` routes and the frontend media page renders nothing (opt-in at the env level, same pattern as the vacuum sidecar).
 
-### One-time OAuth2 setup
-
-Run once interactively on the Pi before starting the service:
-
-```bash
-cd services/media
-uv run yt-dlp --username oauth2 --password '' "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-# Visit the printed URL on any device, sign in with the YouTube Premium account
-# Token is cached in ~/.cache/yt-dlp/ — auto-refreshed on subsequent runs
-```
-
 ### Adding artists
 
-Edit `services/media/data/artists.json`. To find a browse ID:
+Edit `services/media/data/artists.json`. The `id` field is the YouTube channel ID — find it in the URL bar when visiting the artist on `music.youtube.com`: `https://music.youtube.com/channel/UCxxxxxx`. You can also search:
 
 ```bash
 uv run python -c "
@@ -318,6 +311,8 @@ for r in results[:3]:
     print(r['browseId'], r['artist'])
 "
 ```
+
+The `browseId` returned by `search()` is the channel ID (`UC…`) to put in `artists.json`.
 
 ---
 
@@ -341,7 +336,7 @@ family-planner/
 │       │   ├── cast_service.py
 │       │   └── playback_service.py
 │       ├── data/
-│       │   └── artists.json           # hardcoded artist list with browse IDs
+│       │   └── artists.json           # curated artist list with YouTube channel IDs (UC…)
 │       ├── scripts/
 │       │   └── poc.py                 # POC script (reference, not imported)
 │       ├── pyproject.toml
@@ -436,7 +431,7 @@ On `POST /play` success, invalidate `["media", "status"]` immediately.
 
 ## 10. Open questions and risks
 
-- **yt-dlp OAuth2 token expiry.** Refresh tokens last months to years and auto-refresh, but a Google-forced re-auth (password change, suspicious activity) would break extraction. Mitigation: `GET /status` returns `"error"` with a human-readable message; the admin UI surfaces it.
+- **Netscape cookies expiry.** Browser session cookies typically expire after weeks to months; `__Secure-3PAPISID` and related cookies last longer but will eventually expire or be revoked (password change, suspicious activity). When expired, `ytmusicapi` falls back to unauthenticated (5 items) and yt-dlp may fail on Premium content. Mitigation: `GET /status` returns `"error"` with a human-readable message; re-export cookies from the browser and update `YTDLP_COOKIES_FILE`.
 - **ffmpeg availability.** ffmpeg must be installed as a system package. If missing, `POST /play` fails with a clear error. The health check verifies `ffmpeg -version` on startup.
 - **Stream URL expiry during long albums.** yt-dlp stream URLs expire in ~6 hours. A very long album (unlikely) started close to the expiry window could have ffmpeg fail mid-stream on a later track. Mitigation: refresh URLs lazily when ffmpeg opens each input (use ffmpeg's `-headers` option with a fresh URL fetched just before each track starts — defer this optimisation until it's observed as a real problem).
 - **Cast device connection drops.** The Home Mini occasionally goes offline briefly. Pause/resume commands will fail with a pychromecast error. Return 503, let the frontend show a toast; the user can retry.

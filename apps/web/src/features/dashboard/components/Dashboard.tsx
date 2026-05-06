@@ -10,11 +10,10 @@ import { useMembers } from '@web/features/members';
 import { useTasks } from '@web/features/tasks';
 import { useInstances, useStepInstances } from '@web/features/instances';
 import { useMemberStreaks } from '@web/features/streaks';
-import { buildDashboardMembers } from '../utils';
+import { buildDashboardMembers, getTodayString } from '../utils';
 import { DashboardDateProvider } from '../DashboardDate';
 import type { DashboardMember } from '../types';
 
-const todayString = () => new Date().toLocaleDateString('sv'); // YYYY-MM-DD in local time
 
 const BUCKETS: Array<{ icon: React.ReactNode; label: string; key: keyof DashboardMember['tasks'] }> = [
   { icon: <Sunrise className="w-4 h-4" />, label: 'Morgen', key: 'morgen' },
@@ -26,7 +25,7 @@ const shiftDate = (date: string, days: number): string =>
   addDays(parseISO(date), days).toLocaleDateString('sv');
 
 const Dashboard = () => {
-  const [date, setDate] = useState(todayString);
+  const [date, setDate] = useState(getTodayString);
 
   const { data: apiMembers = [] } = useMembers();
   const { data: tasks = [] } = useTasks({ active: true });
@@ -41,9 +40,9 @@ const Dashboard = () => {
       <div className="flex-1 min-w-0 flex flex-col overflow-hidden bg-slate-900 text-white">
         <DashboardHeader
           date={date}
-          onPrev={() => setDate((d) => shiftDate(d, -1))}
-          onNext={() => setDate((d) => shiftDate(d, +1))}
-          onToday={() => setDate(todayString())}
+          onPrev={() => setDate((d: string) => shiftDate(d, -1))}
+          onNext={() => setDate((d: string) => shiftDate(d, +1))}
+          onToday={() => setDate(getTodayString())}
         />
 
         {/* Desktop layout: member columns + calendar sidebar */}

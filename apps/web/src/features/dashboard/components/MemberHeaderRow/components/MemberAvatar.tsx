@@ -4,7 +4,7 @@ import { Flame } from 'lucide-react';
 import ProgressRing from './ProgressRing';
 import CompletionBurst from './CompletionBurst';
 import CompletionMessage from './CompletionMessage';
-import { getCompletionProgress } from '../../../utils';
+import { getCompletionProgress, getTodayString } from '../../../utils';
 import { playFanfare } from '../../../sounds';
 import { useDashboardDate } from '../../../DashboardDate';
 import type { DashboardMember } from '../../../types';
@@ -29,7 +29,7 @@ const MemberAvatar = ({ member }: MemberAvatarProps) => {
       prevCompleteRef.current = isComplete;
       return;
     }
-    if (isComplete && !prevCompleteRef.current) {
+    if (isComplete && !prevCompleteRef.current && date === getTodayString()) {
       animate(scope.current, { scale: [1, 1.15, 0.92, 1.08, 1] }, { duration: 0.55 });
       setBurstKey((k) => k + 1);
       setMsgKey((k) => k + 1);

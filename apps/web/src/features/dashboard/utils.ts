@@ -80,7 +80,16 @@ export const buildDashboardMembers = (
   });
 };
 
-export const getTodayString = (): string => new Date().toLocaleDateString('sv');
+// Before 3am we're still in the previous day's window (rollover happens at 03:00).
+export const getTodayString = (): string => {
+  const now = new Date();
+  if (now.getHours() < 3) {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return yesterday.toLocaleDateString('sv');
+  }
+  return now.toLocaleDateString('sv');
+};
 
 export const isDueTimeOverdue = (dueByTime: string): boolean => {
   const [h, m] = dueByTime.split(':').map(Number);
