@@ -3,6 +3,7 @@ import { addDays, parseISO } from 'date-fns'
 import CalendarSection from './components/CalendarSection'
 import WeatherSection from './components/WeatherSection'
 import VacuumWidget from './components/VacuumWidget'
+import MediaWidget from './components/MediaWidget'
 import { VacuumControls } from '@web/features/vacuum'
 import { useDashboardDate } from '../../DashboardDate'
 import { useCalendarEvents } from '@web/features/calendar'
@@ -91,6 +92,7 @@ const CalendarColumn = () => {
 
   return (
     <div className="flex flex-col bg-slate-800/50 border-t border-slate-700/60 lg:flex-[1.3] lg:border-t-0 lg:border-l min-w-0 lg:overflow-y-auto">
+      <MediaWidget />
       <WeatherSection />
 
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
