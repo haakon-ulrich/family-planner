@@ -102,6 +102,22 @@ app.post('/stop', async (c) => {
   }
 });
 
+app.post('/skip', async (c) => {
+  let payload: unknown;
+  try {
+    payload = await c.req.json();
+  } catch {
+    return c.json({ error: { code: 'INVALID_BODY', message: 'Request body must be valid JSON' } }, 400);
+  }
+  try {
+    const { body, status } = await proxyPost('/skip', payload);
+    return c.json(body, status as 200);
+  } catch (err) {
+    log.warn({ err }, 'Media sidecar unreachable');
+    return c.json(offline(), 503);
+  }
+});
+
 app.get('/status', async (c) => {
   try {
     const { body, status } = await proxyGet('/status');

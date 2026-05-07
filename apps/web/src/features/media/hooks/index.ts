@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchAlbums, fetchArtists, fetchMediaStatus, postPause, postPlay, postResume, postStop } from '../api';
+import { fetchAlbums, fetchArtists, fetchMediaStatus, postPause, postPlay, postResume, postSkip, postStop } from '../api';
 
 export const MEDIA_ARTISTS_KEY = ['media', 'artists'] as const;
 export const mediaAlbumsKey = (artistId: string) => ['media', 'albums', artistId] as const;
@@ -55,6 +55,14 @@ export const useStop = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: postStop,
+    onSettled: () => qc.invalidateQueries({ queryKey: MEDIA_STATUS_KEY }),
+  });
+};
+
+export const useSkip = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (trackIndex: number) => postSkip(trackIndex),
     onSettled: () => qc.invalidateQueries({ queryKey: MEDIA_STATUS_KEY }),
   });
 };

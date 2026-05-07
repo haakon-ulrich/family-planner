@@ -68,6 +68,8 @@ class PlaybackSession:
     album_thumbnail_url: str | None
     track_video_ids: list[str]
     stream_urls: list[str]
+    sidecar_stream_url: str
+    current_track_index: int = 0
     state: str = "playing"
     ffmpeg_process: asyncio.subprocess.Process | None = field(default=None, repr=False)
     cast_device: Any = field(default=None, repr=False)  # pychromecast.Chromecast
@@ -85,6 +87,7 @@ def start_session(
     album_thumbnail_url: str | None,
     video_ids: list[str],
     stream_urls: list[str],
+    sidecar_stream_url: str,
     cast_device: Any = None,
 ) -> PlaybackSession:
     global _session
@@ -94,6 +97,7 @@ def start_session(
         album_thumbnail_url=album_thumbnail_url,
         track_video_ids=video_ids,
         stream_urls=stream_urls,
+        sidecar_stream_url=sidecar_stream_url,
         cast_device=cast_device,
     )
     logger.info("Session started: %r (%d track(s))", album_title, len(video_ids))
@@ -126,8 +130,16 @@ async def open_ffmpeg_stream() -> asyncio.StreamReader:
             pass
         session.ffmpeg_process = None
 
-    args = build_ffmpeg_args(session.stream_urls)
-    logger.info("Starting ffmpeg: %d track(s)", len(session.stream_urls))
+    tracks_from_current = session.stream_urls[session.current_track_index:]
+    if not tracks_from_current:
+        raise RuntimeError("No tracks remaining from current_track_index")
+
+    args = build_ffmpeg_args(tracks_from_current)
+    logger.info(
+        "Starting ffmpeg: %d track(s) from index %d",
+        len(tracks_from_current),
+        session.current_track_index,
+    )
     proc = await asyncio.create_subprocess_exec(
         *args,
         stdout=asyncio.subprocess.PIPE,
@@ -148,6 +160,38 @@ def kill_ffmpeg() -> None:
     except Exception as exc:
         logger.warning("Could not kill ffmpeg: %s", exc)
     _session.ffmpeg_process = None
+
+
+async def skip_to_track(index: int) -> None:
+    """Jump to an absolute track index and reconnect the Cast device to /stream."""
+    from services import cast_service
+
+    session = get_active_session()
+    if session is None:
+        raise RuntimeError("No active session")
+
+    clamped = max(0, min(index, len(session.stream_urls) - 1))
+    session.current_track_index = clamped
+    logger.info("Skipping to track index %d", clamped)
+
+    # Kill ffmpeg so the Cast device's open /stream connection drops immediately.
+    kill_ffmpeg()
+
+    # Re-issue play_media so the Cast device opens a new /stream connection,
+    # which will start ffmpeg from the new current_track_index.
+    if session.cast_device is not None:
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(
+                None,
+                cast_service.play_stream,
+                session.cast_device,
+                session.sidecar_stream_url,
+            )
+        except Exception as exc:
+            logger.warning("play_stream failed during skip: %s", exc)
+            cast_service.invalidate()
+            raise
 
 
 def stop_session() -> None:

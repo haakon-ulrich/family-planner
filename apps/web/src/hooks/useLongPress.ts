@@ -2,12 +2,17 @@ import { useRef, useCallback } from 'react';
 
 const useLongPress = (onLongPress: () => void, delay = 600) => {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firedRef = useRef(false);
 
   const start = useCallback(
     (e: React.MouseEvent | React.TouchEvent) => {
-      // Prevent context menu / text selection on long touch
       e.preventDefault();
-      timerRef.current = setTimeout(onLongPress, delay);
+      e.stopPropagation();
+      firedRef.current = false;
+      timerRef.current = setTimeout(() => {
+        firedRef.current = true;
+        onLongPress();
+      }, delay);
     },
     [onLongPress, delay],
   );
@@ -19,13 +24,22 @@ const useLongPress = (onLongPress: () => void, delay = 600) => {
     }
   }, []);
 
+  const consumeFired = useCallback(() => {
+    const v = firedRef.current;
+    firedRef.current = false;
+    return v;
+  }, []);
+
   return {
-    onMouseDown: start,
-    onMouseUp: cancel,
-    onMouseLeave: cancel,
-    onTouchStart: start,
-    onTouchEnd: cancel,
-    onTouchMove: cancel,
+    handlers: {
+      onMouseDown: start,
+      onMouseUp: cancel,
+      onMouseLeave: cancel,
+      onTouchStart: start,
+      onTouchEnd: cancel,
+      onTouchMove: cancel,
+    },
+    consumeFired,
   };
 };
 

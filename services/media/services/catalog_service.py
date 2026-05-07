@@ -129,17 +129,34 @@ def _fetch_albums(channel_id: str) -> list[Album]:
         logger.warning("get_artist(%r) failed: %s", channel_id, exc)
         return []
 
-    albums_section: dict[str, Any] = artist_data.get("albums") or {}
-    raw: list[Any] = albums_section.get("results") or []
-    section_browse_id: str | None = albums_section.get("browseId")
-    section_params: str | None = albums_section.get("params")
+    # "albums" covers standard releases; "podcasts" covers content shown under
+    # "Audiobooks and shows" in YouTube Music (e.g. audio drama series).
+    section: dict[str, Any] = {}
+    section_key: str | None = None
+    for key in ("albums", "podcasts"):
+        candidate: dict[str, Any] = artist_data.get(key) or {}
+        if candidate.get("results") or candidate.get("browseId"):
+            section = candidate
+            section_key = key
+            break
+
+    raw: list[Any] = section.get("results") or []
+    section_browse_id: str | None = section.get("browseId")
+    section_params: str | None = section.get("params")
 
     logger.info(
-        "get_artist(%r): shelf=%d album(s), full-listing params=%s",
+        "get_artist(%r): section=%r, shelf=%d item(s), full-listing params=%s",
         channel_id,
+        section_key,
         len(raw),
         "present" if section_params else "missing",
     )
+    if section_key is None:
+        logger.warning(
+            "get_artist(%r): no catalogue section found — available keys: %s",
+            channel_id,
+            [k for k in artist_data if not k.startswith("_")],
+        )
 
     if section_browse_id and section_params:
         try:
@@ -147,14 +164,15 @@ def _fetch_albums(channel_id: str) -> list[Album]:
                 section_browse_id, section_params, limit=_ALBUM_LIMIT
             )
             if full:
-                logger.info("get_artist_albums returned %d album(s)", len(full))
+                logger.info("get_artist_albums returned %d item(s)", len(full))
                 return _parse_album_list(full)
         except Exception as exc:
             logger.warning("get_artist_albums failed, using shelf only: %s", exc)
-    else:
+    elif section_key is not None:
         logger.warning(
-            "get_artist(%r): no full-listing params — shelf only (%d album(s))",
+            "get_artist(%r): no full-listing params for section %r — shelf only (%d item(s))",
             channel_id,
+            section_key,
             len(raw),
         )
 

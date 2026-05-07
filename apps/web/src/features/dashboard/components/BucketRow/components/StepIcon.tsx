@@ -4,6 +4,7 @@ import type { TaskStep } from '../../../types';
 import { useDashboardDate } from '../../../DashboardDate';
 import { useUpsertStepInstance } from '@web/features/instances';
 import { playClick } from '@web/features/dashboard/sounds';
+import useLongPress from '@web/hooks/useLongPress';
 
 interface StepIconProps {
   step: TaskStep;
@@ -16,19 +17,28 @@ const StepIcon = ({ step, color, isToday, overdue }: StepIconProps) => {
   const date = useDashboardDate();
   const upsert = useUpsertStepInstance();
   const done = step.status === 'completed';
+  const canInteract = !done && isToday && !overdue;
+  const canUncomplete = done && isToday;
 
-  const canInteract = done ? isToday : isToday && !overdue;
+  const { handlers: longPressHandlers, consumeFired } = useLongPress(() => {
+    if (canUncomplete) {
+      playClick();
+      upsert.mutate({ taskStepId: step.id, date, status: 'pending' });
+    }
+  });
 
   const handleToggle = () => {
+    if (consumeFired()) return;
     if (!canInteract) return;
     playClick();
-    upsert.mutate({ taskStepId: step.id, date, status: done ? 'pending' : 'completed' });
+    upsert.mutate({ taskStepId: step.id, date, status: 'completed' });
   };
 
   return (
     <motion.div
       whileTap={canInteract ? { scale: 0.8 } : undefined}
       onClick={handleToggle}
+      {...(canUncomplete ? longPressHandlers : {})}
       className={`relative w-12 h-12 flex items-center justify-center ${canInteract ? 'cursor-pointer' : 'cursor-default'}`}
       transition={{ type: 'spring', stiffness: 500, damping: 25 }}
     >

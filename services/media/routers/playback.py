@@ -8,6 +8,7 @@ from models import (
     PlayData,
     PlayRequest,
     PlayResponse,
+    SkipRequest,
     StatusData,
     StatusResponse,
 )
@@ -73,7 +74,9 @@ async def play(req: PlayRequest) -> PlayResponse:
             detail={"code": "CAST_ERROR", "message": str(exc)},
         ) from exc
 
-    playback_service.start_session(album_title, album_thumbnail_url, video_ids, stream_urls, device)
+    playback_service.start_session(
+        album_title, album_thumbnail_url, video_ids, stream_urls, sidecar_stream_url, device
+    )
     logger.info("Playback started: %r → %s", album_title, sidecar_stream_url)
 
     return PlayResponse(
@@ -113,12 +116,38 @@ async def stop() -> OkResponse:
     return OkResponse(data=OkData(ok=True))
 
 
+@router.post("/skip")
+async def skip(req: SkipRequest) -> OkResponse:
+    session = playback_service.get_active_session()
+    if session is None:
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "NO_SESSION", "message": "No active playback session"},
+        )
+    try:
+        await playback_service.skip_to_track(req.track_index)
+    except Exception as exc:
+        logger.exception("skip_to_track failed")
+        raise HTTPException(
+            status_code=503,
+            detail={"code": "SKIP_ERROR", "message": str(exc)},
+        ) from exc
+    return OkResponse(data=OkData(ok=True))
+
+
 @router.get("/status")
 async def status() -> StatusResponse:
     session = playback_service.get_active_session()
     if session is None:
         return StatusResponse(
-            data=StatusData(state="idle", album_title=None, album_thumbnail_url=None, device_name=None)
+            data=StatusData(
+                state="idle",
+                album_title=None,
+                album_thumbnail_url=None,
+                device_name=None,
+                track_index=None,
+                track_count=None,
+            )
         )
     return StatusResponse(
         data=StatusData(
@@ -126,5 +155,7 @@ async def status() -> StatusResponse:
             album_title=session.album_title,
             album_thumbnail_url=session.album_thumbnail_url,
             device_name=settings.cast_device_name,
+            track_index=session.current_track_index,
+            track_count=len(session.stream_urls),
         )
     )

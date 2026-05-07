@@ -3,7 +3,7 @@ import { isKioskMode } from '@web/lib/kioskMode';
 
 type KeyboardHandle = { setInput: (value: string) => void };
 
-const TEXT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel']);
+const TEXT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'date', 'time']);
 const NUMBER_TYPES = new Set(['number']);
 
 // Simulates a React-compatible value change on a controlled input without

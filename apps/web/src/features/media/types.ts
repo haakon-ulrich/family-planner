@@ -19,4 +19,6 @@ export type MediaStatus = {
   album_title: string | null;
   album_thumbnail_url: string | null;
   device_name: string | null;
+  track_index: number | null;
+  track_count: number | null;
 };

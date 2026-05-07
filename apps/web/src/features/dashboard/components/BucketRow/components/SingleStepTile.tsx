@@ -28,18 +28,25 @@ const SingleStepTile = ({
   const isCompleted = status === 'completed';
   const isToday = date === getTodayString();
   const overdue = !!dueByTime && isToday && isDueTimeOverdue(dueByTime);
-  const canInteract = isCompleted ? isToday : isToday && !overdue;
+  const canInteract = isToday && !isCompleted && !overdue;
   const canPostpone = postponable && isToday && !isCompleted;
+  const canUncomplete = isCompleted && isToday;
+
+  const { handlers: longPressHandlers, consumeFired } = useLongPress(() => {
+    if (canUncomplete) {
+      playClick();
+      upsert.mutate({ taskId: id, date, status: 'pending' });
+    } else if (canPostpone) {
+      setShowPostponeModal(true);
+    }
+  });
 
   const handleToggle = () => {
+    if (consumeFired()) return;
     if (!canInteract) return;
     playClick();
-    upsert.mutate({ taskId: id, date, status: isCompleted ? 'pending' : 'completed' });
+    upsert.mutate({ taskId: id, date, status: 'completed' });
   };
-
-  const longPress = useLongPress(() => {
-    if (canPostpone) setShowPostponeModal(true);
-  });
 
   const handlePostponeConfirm = () => {
     setShowPostponeModal(false);
@@ -67,7 +74,7 @@ const SingleStepTile = ({
       <motion.div
         whileTap={canInteract ? { scale: 0.93 } : undefined}
         onClick={handleToggle}
-        {...(canPostpone ? longPress : {})}
+        {...(canPostpone || canUncomplete ? longPressHandlers : {})}
         className={`flex flex-col items-center pt-3 pb-2.5 rounded-2xl select-none ${canInteract ? 'cursor-pointer' : 'cursor-default'} ${bgClass} ${dimmed ? 'opacity-50' : ''}`}
         style={isCompleted ? { backgroundColor: `${color}18` } : undefined}
         transition={{ type: 'spring', stiffness: 400, damping: 25 }}

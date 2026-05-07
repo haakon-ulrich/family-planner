@@ -19,7 +19,7 @@ const MultiStepTile = ({ id, title, steps, color, dueByTime, postponable }: Mult
   const overdue = !!dueByTime && isToday && isDueTimeOverdue(dueByTime);
   const canPostpone = postponable && isToday && !allDone;
 
-  const longPress = useLongPress(() => {
+  const { handlers: longPressHandlers } = useLongPress(() => {
     if (canPostpone) setShowPostponeModal(true);
   });
 
@@ -41,7 +41,7 @@ const MultiStepTile = ({ id, title, steps, color, dueByTime, postponable }: Mult
         />
       )}
       <div
-        {...(canPostpone ? longPress : {})}
+        {...(canPostpone ? longPressHandlers : {})}
         className={`flex flex-col items-center pt-3 pb-2.5 px-2 rounded-2xl select-none transition-colors duration-300 ${bgClass} ${dimmed ? 'opacity-50' : ''}`}
         style={allDone ? { backgroundColor: `${color}18` } : undefined}
       >

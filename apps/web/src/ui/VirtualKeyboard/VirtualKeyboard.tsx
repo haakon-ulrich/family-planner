@@ -9,13 +9,13 @@ type KeyboardHandle = { setInput: (value: string) => void };
 const textLayout = {
   default: [
     'q w e r t z u i o p ü',
-    'a s d f g h j k l ö ä',
+    'a s d f g h j k l ö ä ß',
     '{shift} y x c v b n m {bksp}',
     '{numbers} , {space} . {done}',
   ],
   shift: [
     'Q W E R T Z U I O P Ü',
-    'A S D F G H J K L Ö Ä',
+    'A S D F G H J K L Ö Ä ẞ',
     '{shift} Y X C V B N M {bksp}',
     '{numbers} , {space} . {done}',
   ],

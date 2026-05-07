@@ -17,7 +17,9 @@ const ArtistRow = ({ artist, isSelected, onSelect }: RowProps) => {
       onClick={() => onSelect(artist.id)}
       className={[
         'flex items-center gap-3 px-4 py-3 w-full text-left transition-colors rounded-l-2xl',
-        isSelected ? 'bg-slate-700 text-white' : 'text-slate-300 hover:bg-slate-700/60 hover:text-white',
+        isSelected
+          ? 'bg-slate-700 text-white'
+          : 'text-slate-300 hover:bg-slate-700/60 hover:text-white',
       ].join(' ')}
     >
       {artist.thumbnail_url && !imgError ? (
@@ -58,14 +60,16 @@ const ArtistList = () => {
 
   return (
     <div className="flex flex-col pt-6 pl-6">
-      {artists?.map((artist) => (
-        <ArtistRow
-          key={artist.id}
-          artist={artist}
-          isSelected={selectedArtistId === artist.id}
-          onSelect={setSelectedArtist}
-        />
-      ))}
+      {artists
+        ?.sort((a, b) => a.name.localeCompare(b.name))
+        .map((artist) => (
+          <ArtistRow
+            key={artist.id}
+            artist={artist}
+            isSelected={selectedArtistId === artist.id}
+            onSelect={setSelectedArtist}
+          />
+        ))}
     </div>
   );
 };

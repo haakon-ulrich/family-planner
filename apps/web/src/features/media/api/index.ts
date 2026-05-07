@@ -30,3 +30,10 @@ export const postResume = (): Promise<{ ok: boolean }> =>
 
 export const postStop = (): Promise<{ ok: boolean }> =>
   fetch('/api/media/stop', { method: 'POST' }).then((r) => json(r));
+
+export const postSkip = (trackIndex: number): Promise<{ ok: boolean }> =>
+  fetch('/api/media/skip', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ track_index: trackIndex }),
+  }).then((r) => json(r));

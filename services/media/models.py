@@ -50,10 +50,16 @@ class StatusData(BaseModel):
     album_title: str | None
     album_thumbnail_url: str | None
     device_name: str | None
+    track_index: int | None
+    track_count: int | None
 
 
 class StatusResponse(BaseModel):
     data: StatusData
+
+
+class SkipRequest(BaseModel):
+    track_index: int
 
 
 class OkData(BaseModel):

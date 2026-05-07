@@ -116,8 +116,11 @@ The sidecar holds one in-memory `PlaybackSession` at a time:
 | Field | Type | Description |
 |---|---|---|
 | `album_title` | str | Human-readable label for status |
+| `album_thumbnail_url` | str \| None | Used by status and frontend player |
 | `track_video_ids` | list[str] | Ordered YouTube video IDs |
-| `stream_urls` | list[str] | Corresponding yt-dlp stream URLs |
+| `stream_urls` | list[str] | Corresponding yt-dlp stream URLs (all tracks) |
+| `current_track_index` | int | Index into `stream_urls` — ffmpeg starts from here |
+| `sidecar_stream_url` | str | `http://<pi_ip>:3002/stream` — stored so skip can reissue play_media without recomputing |
 | `state` | enum | `idle`, `playing`, `paused`, `stopped` |
 | `ffmpeg_process` | `asyncio.Process \| None` | Running ffmpeg, killed on stop |
 | `cast_device` | Chromecast | pychromecast device handle |
@@ -215,21 +218,45 @@ Calls `target.quit_app()`, kills the ffmpeg process, clears the session.
 { "data": { "ok": true } }
 ```
 
+### `POST /skip`
+
+Jumps to a specific track by absolute index and restarts playback from there. Returns 503 if no active session.
+
+```json
+{ "track_index": 3 }
+```
+
+Flow:
+1. Clamp `track_index` to `[0, track_count - 1]`.
+2. Update `session.current_track_index`.
+3. Kill the running ffmpeg process (the Cast device's open `/stream` connection drops).
+4. Re-issue `play_media(sidecar_stream_url, "audio/mp4")` on the Cast device so it opens a new `/stream` connection.
+5. The new `/stream` request starts ffmpeg from `stream_urls[current_track_index:]`.
+
+```json
+{ "data": { "ok": true } }
+```
+
+The ~2–5 s reconnection gap is inherent to the streaming architecture and is not optimisable further on the backend. Rapid consecutive skip requests are handled by **frontend debounce** (see §9) — no debounce logic lives in the sidecar.
+
 ### `GET /status`
 
-Returns current playback state for the dashboard widget.
+Returns current playback state for the dashboard widget and media page player.
 
 ```json
 {
   "data": {
     "state": "playing",
     "album_title": "TKKG 1 – Freddy, fass!",
-    "device_name": "Living Room speaker"
+    "album_thumbnail_url": "https://lh3.googleusercontent.com/...",
+    "device_name": "Living Room speaker",
+    "track_index": 2,
+    "track_count": 12
   }
 }
 ```
 
-`state` values: `"idle"`, `"playing"`, `"paused"`, `"stopped"`, `"error"`.
+`state` values: `"idle"`, `"playing"`, `"paused"`, `"stopped"`, `"error"`. `track_index` and `track_count` are `null` when `state` is `"idle"`.
 
 ### `GET /stream`
 
@@ -269,11 +296,12 @@ Owns pychromecast device discovery and the active Cast connection.
 Owns the playback session, yt-dlp extraction, and ffmpeg lifecycle.
 
 - `extract_stream_urls(video_ids: list[str]) -> list[str]` — runs yt-dlp in a thread pool executor (yt-dlp is synchronous), all tracks in parallel via `asyncio.gather`. Format selector: `bestaudio[ext=m4a]/bestaudio/best`. OAuth2 credentials used if configured.
-- `start_session(album_title, video_ids, stream_urls, device) -> PlaybackSession`
+- `start_session(album_title, album_thumbnail_url, video_ids, stream_urls, sidecar_stream_url, device) -> PlaybackSession`
 - `get_active_session() -> PlaybackSession | None`
 - `stop_session() -> None` — kills ffmpeg if running, disconnects device
 - `build_ffmpeg_args(stream_urls: list[str]) -> list[str]` — constructs the ffmpeg argument list with concat filter, `-c:a libmp3lame -b:a 192k -f mp3 pipe:1`
-- `open_ffmpeg_stream() -> asyncio.StreamReader` — `asyncio.create_subprocess_exec`, returns stdout reader
+- `open_ffmpeg_stream() -> asyncio.StreamReader` — builds args from `session.stream_urls[session.current_track_index:]`, calls `asyncio.create_subprocess_exec`, returns stdout reader
+- `skip_to_track(index: int) -> None` — clamps index, updates `current_track_index`, calls `kill_ffmpeg()`, then re-issues `cast_service.play_stream(session.cast_device, session.sidecar_stream_url)` in an executor so the Cast device reconnects to `/stream`
 
 ---
 
@@ -392,6 +420,7 @@ sudo apt install -y ffmpeg
 /api/media/pause              → POST :3002/pause
 /api/media/resume             → POST :3002/resume
 /api/media/stop               → POST :3002/stop
+/api/media/skip               → POST :3002/skip
 /api/media/status             → GET  :3002/status
 /api/media/health             → GET  :3002/health
 ```
@@ -442,8 +471,11 @@ A single route: `/media`. There is no nested route for albums — the album view
 
 **Now playing bar (right panel, top)**
 - Visible only when `status.state !== "idle"`
-- Left: album thumbnail + title; Right: pause/resume toggle + stop button
+- Left: album thumbnail + title; Right: ⏮ skip-back, pause/resume toggle, ⏭ skip-forward, ⏹ stop
+- "Track N / M" label between the skip buttons and the stop button
 - Pause/resume is optimistic — flip state immediately, revert on error
+- Skip buttons use a **frontend debounce** (350 ms): each tap updates a local `pendingTrackIndex` immediately (clamped, gives instant visual feedback), and a single `POST /skip` with the final index fires after 350 ms of no further taps. The backend receives exactly one request regardless of how many times the user tapped. ⏮ is disabled when `pendingTrackIndex === 0`; ⏭ is disabled when `pendingTrackIndex === track_count - 1`.
+- Skip buttons are **not** shown in the dashboard mini-player (pause/resume/stop only there).
 
 ### Layout — Dashboard mini-player
 
@@ -467,7 +499,7 @@ Rendered at the top of the calendar column, above the day's task list. Visible o
 ["media", "status"]                    // playback status, polled every 5 s
 ```
 
-On `POST /play` success, invalidate `["media", "status"]` immediately.
+On `POST /play` or `POST /skip` success, invalidate `["media", "status"]` immediately.
 
 ### Zustand store (`media/store.ts`)
 
@@ -476,6 +508,8 @@ selectedArtistId: string | null        // which artist's albums are shown
 loadingAlbumBrowseId: string | null    // which album cell shows a spinner
 ```
 
+`pendingTrackIndex` is local state inside `NowPlaying` — it is only consumed by that component and does not need to be shared globally.
+
 ### Playback flow
 
 1. User taps artist → `selectedArtistId` set, album grid loads.
@@ -483,6 +517,7 @@ loadingAlbumBrowseId: string | null    // which album cell shows a spinner
 3. On response, `loadingAlbumBrowseId` cleared; on success `["media", "status"]` invalidated.
 4. Status poll (every 5 s) picks up new state; now playing bar appears on media page and dashboard.
 5. Pause/resume/stop update status optimistically and call their respective endpoints.
+6. Skip taps increment/decrement `pendingTrackIndex` immediately (clamped). After 350 ms of no further taps, `POST /skip` fires with the final index and `["media", "status"]` is invalidated on success. `pendingTrackIndex` is reset to `null` once the status poll returns the updated server value.
 
 ---
 
