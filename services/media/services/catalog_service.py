@@ -133,7 +133,7 @@ def _fetch_albums(channel_id: str) -> list[Album]:
     # "Audiobooks and shows" in YouTube Music (e.g. audio drama series).
     section: dict[str, Any] = {}
     section_key: str | None = None
-    for key in ("albums", "podcasts"):
+    for key in ("albums", "shows", "podcasts"):
         candidate: dict[str, Any] = artist_data.get(key) or {}
         if candidate.get("results") or candidate.get("browseId"):
             section = candidate
