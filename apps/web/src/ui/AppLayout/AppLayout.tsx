@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import AppSidebar from '@web/ui/AppSidebar';
+import useAutoReturn from '@web/hooks/useAutoReturn';
 
 const AppLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { pathname } = useLocation();
+
+  useAutoReturn(pathname);
 
   useEffect(() => {
     setSidebarOpen(false);

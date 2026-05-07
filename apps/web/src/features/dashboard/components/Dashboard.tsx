@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Moon, Sun, Sunrise } from 'lucide-react';
 import { addDays, parseISO } from 'date-fns';
 import DashboardHeader from './DashboardHeader';
@@ -26,6 +26,14 @@ const shiftDate = (date: string, days: number): string =>
 
 const Dashboard = () => {
   const [date, setDate] = useState(getTodayString);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const today = getTodayString();
+      if (date < today) setDate(today);
+    }, 60_000);
+    return () => clearInterval(id);
+  }, [date]);
 
   const { data: apiMembers = [] } = useMembers();
   const { data: tasks = [] } = useTasks({ active: true });
