@@ -170,7 +170,33 @@ systemctl enable family-planner-media
 # Service is NOT started here — yt-cookies.txt and artists.json must be in place first
 echo "==> family-planner-media.service installed (not started)"
 
-# ── 17. Kiosk autologin on tty1 ──────────────────────────────────────────────
+# ── 17. Mower sidecar Python venv ─────────────────────────────────────────────
+echo "==> Setting up mower sidecar Python venv..."
+cd "$APP_DIR/services/mower"
+uv sync
+chmod -R a+rX /root/.local/share/uv/python/
+cd "$APP_DIR"
+
+# ── 18. Mower sidecar env ─────────────────────────────────────────────────────
+if ! grep -q "^MAMMOTION_ID=" "$ENV_FILE" 2>/dev/null; then
+  cat >> "$ENV_FILE" << MOWER_ENV
+MAMMOTION_ID=
+MAMMOTION_PASSWORD=
+MAMMOTION_DEVICE_NAME=Luba-VPHZXWVD
+MOWER_SIDECAR_PORT=3003
+MOWER_SIDECAR_URL=http://localhost:3003
+MOWER_ENV
+fi
+
+# ── 19. Mower sidecar systemd service ─────────────────────────────────────────
+echo "==> Installing mower sidecar service..."
+cp "$APP_DIR/scripts/family-planner-mower.service" /etc/systemd/system/family-planner-mower.service
+systemctl daemon-reload
+systemctl enable family-planner-mower
+# Service is NOT started here — MAMMOTION_ID and MAMMOTION_PASSWORD must be set first
+echo "==> family-planner-mower.service installed (not started)"
+
+# ── 20. Kiosk autologin on tty1 ──────────────────────────────────────────────
 echo "==> Configuring kiosk autologin..."
 mkdir -p /etc/systemd/system/getty@tty1.service.d
 cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf << EOF
@@ -259,12 +285,19 @@ echo "     c. Fix permissions: sudo chown -R family-planner:family-planner /var/
 echo "     d. Edit CAST_DEVICE_NAME in $ENV_FILE if needed"
 echo "     e. Start the service: sudo systemctl start family-planner-media"
 echo ""
-echo "  6. Reboot for kiosk:          sudo reboot"
+echo "  6. Set up the mower sidecar:"
+echo "     a. Set MAMMOTION_ID and MAMMOTION_PASSWORD in $ENV_FILE"
+echo "     b. Optionally update MAMMOTION_DEVICE_NAME (default: Luba-VPHZXWVD)"
+echo "     c. Start the service: sudo systemctl start family-planner-mower"
+echo ""
+echo "  7. Reboot for kiosk:          sudo reboot"
 echo ""
 echo "  Useful commands:"
 echo "    sudo journalctl -u family-planner -f          # backend logs"
 echo "    sudo journalctl -u family-planner-vacuum -f   # vacuum sidecar logs"
 echo "    sudo journalctl -u family-planner-media -f    # media sidecar logs"
+echo "    sudo journalctl -u family-planner-mower -f    # mower sidecar logs"
 echo "    sudo systemctl status family-planner          # service status"
 echo "    sudo systemctl status family-planner-vacuum   # sidecar status"
 echo "    sudo systemctl status family-planner-media    # media sidecar status"
+echo "    sudo systemctl status family-planner-mower    # mower sidecar status"

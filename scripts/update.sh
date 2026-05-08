@@ -29,10 +29,17 @@ uv sync
 chmod -R a+rX /root/.local/share/uv/python/
 cd "$APP_DIR"
 
+echo "==> Syncing mower sidecar dependencies..."
+cd "$APP_DIR/services/mower"
+uv sync
+chmod -R a+rX /root/.local/share/uv/python/
+cd "$APP_DIR"
+
 echo "==> Restarting services..."
 systemctl restart family-planner
 systemctl restart family-planner-vacuum
 systemctl restart family-planner-media
-systemctl status family-planner family-planner-vacuum family-planner-media --no-pager
+systemctl restart family-planner-mower
+systemctl status family-planner family-planner-vacuum family-planner-media family-planner-mower --no-pager
 
 echo "==> Done."

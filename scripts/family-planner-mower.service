@@ -1,0 +1,25 @@
+[Unit]
+Description=Family Planner mower sidecar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=family-planner
+Group=family-planner
+WorkingDirectory=/opt/family-planner/services/mower
+EnvironmentFile=/etc/family-planner/.env
+ExecStart=/opt/family-planner/services/mower/.venv/bin/python app.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=family-planner-mower
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

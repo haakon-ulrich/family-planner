@@ -1,44 +1,46 @@
-import { Calendar, RefreshCw } from 'lucide-react'
-import { addDays, parseISO } from 'date-fns'
-import CalendarSection from './components/CalendarSection'
-import WeatherSection from './components/WeatherSection'
-import VacuumWidget from './components/VacuumWidget'
-import MediaWidget from './components/MediaWidget'
-import { VacuumControls } from '@web/features/vacuum'
-import { useDashboardDate } from '../../DashboardDate'
-import { useCalendarEvents } from '@web/features/calendar'
-import { useMembers } from '@web/features/members'
-import type { CalendarAppointment } from '../../types'
-import type { CalendarEvent } from '@web/features/calendar'
-import { useRefreshCalendar } from '@web/features/calendar/hooks'
+import { Calendar, RefreshCw } from 'lucide-react';
+import { addDays, parseISO } from 'date-fns';
+import CalendarSection from './components/CalendarSection';
+import WeatherSection from './components/WeatherSection';
+import VacuumWidget from './components/VacuumWidget';
+import MowerWidget from './components/MowerWidget';
+import MediaWidget from './components/MediaWidget';
+import { VacuumControls } from '@web/features/vacuum';
+import { useDashboardDate } from '../../DashboardDate';
+import { useCalendarEvents } from '@web/features/calendar';
+import { useMembers } from '@web/features/members';
+import type { CalendarAppointment } from '../../types';
+import type { CalendarEvent } from '@web/features/calendar';
+import { useRefreshCalendar } from '@web/features/calendar/hooks';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-const todayString = () => new Date().toLocaleDateString('sv')
+const todayString = () => new Date().toLocaleDateString('sv');
 
 const shiftDate = (date: string, days: number): string =>
-  addDays(parseISO(date), days).toLocaleDateString('sv')
+  addDays(parseISO(date), days).toLocaleDateString('sv');
 
 const extractTime = (iso: string): string => {
-  const match = iso.match(/T(\d{2}:\d{2})/)
-  return match ? match[1] : ''
-}
+  const match = iso.match(/T(\d{2}:\d{2})/);
+  return match ? match[1] : '';
+};
 
-const extractDatePart = (iso: string): string =>
-  iso.slice(0, 10)
+const extractDatePart = (iso: string): string => iso.slice(0, 10);
 
 const sectionLabel = (date: string): string => {
-  const today = todayString()
-  const diff = Math.round(
-    (parseISO(date).getTime() - parseISO(today).getTime()) / 86_400_000
-  )
-  if (diff === 0) return 'Heute'
-  if (diff === 1) return 'Morgen'
-  if (diff === -1) return 'Gestern'
-  return parseISO(date).toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'short' })
-}
+  const today = todayString();
+  const diff = Math.round((parseISO(date).getTime() - parseISO(today).getTime()) / 86_400_000);
+  if (diff === 0) return 'Heute';
+  if (diff === 1) return 'Morgen';
+  if (diff === -1) return 'Gestern';
+  return parseISO(date).toLocaleDateString('de-DE', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'short',
+  });
+};
 
 const toAppointment = (
   event: CalendarEvent,
@@ -46,7 +48,7 @@ const toAppointment = (
 ): CalendarAppointment => {
   const colors: string[] = event.memberHint
     ? [memberColorByName.get(event.memberHint) ?? '#64748b']
-    : ['#64748b']
+    : ['#64748b'];
 
   return {
     id: event.id,
@@ -56,37 +58,35 @@ const toAppointment = (
     allDay: event.allDay,
     location: event.location,
     memberColors: colors,
-  }
-}
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
 
-const DAYS_SHOWN = 3
+const DAYS_SHOWN = 2;
 
 const CalendarColumn = () => {
-  const date = useDashboardDate()
-  const start = date
-  const end = shiftDate(date, DAYS_SHOWN) // exclusive upper bound — lt(event.start, end)
+  const date = useDashboardDate();
+  const start = date;
+  const end = shiftDate(date, DAYS_SHOWN); // exclusive upper bound — lt(event.start, end)
 
-  const { data: events = [] } = useCalendarEvents(start, end)
-  const { data: members = [] } = useMembers()
+  const { data: events = [] } = useCalendarEvents(start, end);
+  const { data: members = [] } = useMembers();
 
-  const memberColorByName = new Map(
-    members.map((m) => [m.name.toLowerCase(), m.color])
-  )
+  const memberColorByName = new Map(members.map((m) => [m.name.toLowerCase(), m.color]));
 
   // Group events by their date
-  const days = Array.from({ length: DAYS_SHOWN }, (_, i) => shiftDate(date, i))
+  const days = Array.from({ length: DAYS_SHOWN }, (_, i) => shiftDate(date, i));
 
-  const eventsByDate = new Map<string, CalendarAppointment[]>()
-  for (const day of days) eventsByDate.set(day, [])
+  const eventsByDate = new Map<string, CalendarAppointment[]>();
+  for (const day of days) eventsByDate.set(day, []);
 
   for (const event of events) {
-    const day = extractDatePart(event.start)
+    const day = extractDatePart(event.start);
     if (eventsByDate.has(day)) {
-      eventsByDate.get(day)!.push(toAppointment(event, memberColorByName))
+      eventsByDate.get(day)!.push(toAppointment(event, memberColorByName));
     }
   }
 
@@ -96,12 +96,11 @@ const CalendarColumn = () => {
       <WeatherSection />
 
       <div className="flex items-center justify-between px-5 py-4 border-b border-slate-700/50">
-        <div className='flex items-center gap-2.5'>
-
-        <Calendar className="w-5 h-5 text-slate-500" />
-        <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
-          Kalender
-        </span>
+        <div className="flex items-center gap-2.5">
+          <Calendar className="w-5 h-5 text-slate-500" />
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">
+            Kalender
+          </span>
         </div>
         <button onClick={useRefreshCalendar()}>
           <RefreshCw className="w-5 h-5 text-slate-500 hover:text-white transition-colors" />
@@ -120,8 +119,9 @@ const CalendarColumn = () => {
 
       <VacuumWidget />
       <VacuumControls />
+      <MowerWidget />
     </div>
-  )
-}
+  );
+};
 
-export default CalendarColumn
+export default CalendarColumn;
