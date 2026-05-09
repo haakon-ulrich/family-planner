@@ -76,7 +76,7 @@ const formFromTask = (task: Task): TaskFormState => {
     carryOverIfIncomplete: task.carryOverIfIncomplete,
     postponable: task.postponable,
     active: task.active,
-    steps: task.steps?.map((s) => ({ tempId: s.id, iconValue: s.iconValue })) ?? [],
+    steps: task.steps?.map((s) => ({ tempId: s.id, id: s.id, iconValue: s.iconValue })) ?? [],
     recurrenceKind: task.recurrenceKind,
     weekdays:
       cfg.kind === 'weekdays' ? (cfg.days as Weekday[]) : ['mon', 'tue', 'wed', 'thu', 'fri'],
@@ -133,7 +133,7 @@ const buildPayload = (form: TaskFormState): CreateTask => {
     active: form.active,
     steps:
       form.kind === 'multi'
-        ? form.steps.map((s, i) => ({ iconValue: s.iconValue, sortOrder: i }))
+        ? form.steps.map((s, i) => ({ ...(s.id ? { id: s.id } : {}), iconValue: s.iconValue, sortOrder: i }))
         : undefined,
   };
 };

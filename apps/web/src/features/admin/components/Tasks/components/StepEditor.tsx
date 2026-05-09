@@ -2,7 +2,8 @@ import { Plus, Trash2 } from 'lucide-react';
 import EmojiPicker from '@web/ui/EmojiPicker';
 
 export interface StepField {
-  tempId: string;
+  tempId: string;  // React key only — not sent to the server
+  id?: string;     // DB id; present for existing steps, absent for newly added ones
   iconValue: string;
 }
 

@@ -58,7 +58,7 @@ def invalidate() -> None:
     _device = None
 
 
-def play_stream(device: Any, url: str, content_type: str = "audio/mp4") -> None:
+def play_stream(device: Any, url: str, content_type: str = "audio/mpeg") -> None:
     """Tell the Cast device to start playing url. Runs synchronously — call from executor."""
     if device.app_id is not None and device.app_id != DEFAULT_MEDIA_RECEIVER_APP_ID:
         device.quit_app()

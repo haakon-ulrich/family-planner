@@ -44,7 +44,7 @@ async def play(req: PlayRequest) -> PlayResponse:
 
     # Run yt-dlp extraction and Cast device discovery in parallel.
     try:
-        stream_urls, device = await asyncio.gather(
+        (stream_urls, track_durations), device = await asyncio.gather(
             playback_service.extract_stream_urls(video_ids),
             cast_service.get_device(settings.cast_device_name),
         )
@@ -75,7 +75,7 @@ async def play(req: PlayRequest) -> PlayResponse:
         ) from exc
 
     playback_service.start_session(
-        album_title, album_thumbnail_url, video_ids, stream_urls, sidecar_stream_url, device
+        album_title, album_thumbnail_url, video_ids, stream_urls, track_durations, sidecar_stream_url, device
     )
     logger.info("Playback started: %r → %s", album_title, sidecar_stream_url)
 
@@ -94,6 +94,7 @@ async def pause() -> OkResponse:
         )
     cast_service.pause(session.cast_device)
     session.state = "paused"
+    session.mark_paused()
     return OkResponse(data=OkData(ok=True))
 
 
@@ -107,6 +108,7 @@ async def resume() -> OkResponse:
         )
     cast_service.resume(session.cast_device)
     session.state = "playing"
+    session.mark_playing()
     return OkResponse(data=OkData(ok=True))
 
 
@@ -155,7 +157,7 @@ async def status() -> StatusResponse:
             album_title=session.album_title,
             album_thumbnail_url=session.album_thumbnail_url,
             device_name=settings.cast_device_name,
-            track_index=session.current_track_index,
+            track_index=session.computed_track_index(),
             track_count=len(session.stream_urls),
         )
     )

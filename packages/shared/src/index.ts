@@ -72,7 +72,7 @@ export const TaskStepSchema = z.object({
 });
 export type TaskStep = z.infer<typeof TaskStepSchema>;
 
-export const CreateTaskStepSchema = TaskStepSchema.omit({ id: true, taskId: true });
+export const CreateTaskStepSchema = TaskStepSchema.omit({ taskId: true }).extend({ id: z.uuid().optional() });
 export type CreateTaskStep = z.infer<typeof CreateTaskStepSchema>;
 
 // ---------------------------------------------------------------------------

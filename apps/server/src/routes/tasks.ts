@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq, and, inArray } from 'drizzle-orm';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import { v4 as uuid } from 'uuid';
 import { db } from '@server/db/index';
 import { tasks, taskSteps } from '@server/db/schema';
@@ -140,12 +140,23 @@ app.patch('/:id', async (c) => {
       .returning()
       .all();
 
-    // If steps key was present in the request body, replace all steps
+    // If steps key was present in the request body, replace all steps.
+    // Preserve the IDs of existing steps so their step_instances survive.
     if ('steps' in body) {
-      tx.delete(taskSteps).where(eq(taskSteps.taskId, id)).run();
+      const incomingIds = (stepInputs ?? []).map((s) => s.id).filter(Boolean) as string[];
+      // Delete steps that were removed (not present in the incoming list)
+      const existingSteps = tx.select({ id: taskSteps.id }).from(taskSteps).where(eq(taskSteps.taskId, id)).all();
+      const toDelete = existingSteps.map((s) => s.id).filter((sid) => !incomingIds.includes(sid));
+      if (toDelete.length > 0) {
+        tx.delete(taskSteps).where(inArray(taskSteps.id, toDelete)).run();
+      }
       if (stepInputs && stepInputs.length > 0) {
         tx.insert(taskSteps)
-          .values(stepInputs.map((s, i) => ({ id: uuid(), taskId: id, ...s, sortOrder: s.sortOrder ?? i })))
+          .values(stepInputs.map((s, i) => ({ id: s.id ?? uuid(), taskId: id, iconValue: s.iconValue, sortOrder: s.sortOrder ?? i })))
+          .onConflictDoUpdate({
+            target: taskSteps.id,
+            set: { iconValue: sql`excluded.icon_value`, sortOrder: sql`excluded.sort_order` },
+          })
           .run();
       }
     }
