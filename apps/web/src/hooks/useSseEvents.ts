@@ -16,6 +16,15 @@ const useSseEvents = () => {
 
   useEffect(() => {
     const es = new EventSource('/api/events');
+    let connected = false;
+
+    es.addEventListener('open', () => {
+      if (connected) {
+        // Reconnect after a drop means the server restarted — reload to pick up new JS.
+        window.location.reload();
+      }
+      connected = true;
+    });
 
     es.addEventListener('message', (e: MessageEvent) => {
       let event: SseEvent;
