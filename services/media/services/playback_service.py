@@ -150,7 +150,7 @@ def start_session(
 
 def build_ffmpeg_args(stream_urls: list[str]) -> list[str]:
     n = len(stream_urls)
-    args = ["ffmpeg", "-loglevel", "error"]
+    args = ["ffmpeg", "-loglevel", "warning"]
     for url in stream_urls:
         args += ["-i", url]
     if n > 1:
@@ -226,6 +226,22 @@ def kill_ffmpeg() -> None:
                 rc,
                 f"\nffmpeg stderr: {stderr_snippet}" if stderr_snippet else "",
             )
+
+
+async def drain_ffmpeg() -> int | None:
+    """Await ffmpeg exit and return its returncode.
+
+    Returns None when the process reference was already cleared — which happens
+    synchronously inside kill_ffmpeg() during a skip, before any other coroutine
+    runs.  The caller can use None to distinguish a skip-kill from a natural exit.
+    """
+    if _session is None or _session.ffmpeg_process is None:
+        return None
+    try:
+        await _session.ffmpeg_process.wait()
+        return _session.ffmpeg_process.returncode
+    except Exception:
+        return None
 
 
 async def skip_to_track(index: int) -> None:

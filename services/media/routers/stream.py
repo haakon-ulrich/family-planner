@@ -49,6 +49,16 @@ async def stream() -> StreamingResponse:
             logger.warning("Stream read error after %.1f MB: %s", bytes_sent / 1_048_576, exc)
             raise
         finally:
+            # drain_ffmpeg() returns None when the process was already cleared by a
+            # skip (kill_ffmpeg ran synchronously before this coroutine resumed).
+            # Any non-None returncode means the stream ended on its own — album
+            # finished or ffmpeg errored — so mark the session stopped so the UI
+            # stops showing controls.
+            rc = await playback_service.drain_ffmpeg()
+            if rc is not None:
+                active = playback_service.get_active_session()
+                if active is not None:
+                    active.state = "stopped"
             logger.info("Cast client disconnected from /stream (%.1f MB delivered)", bytes_sent / 1_048_576)
             playback_service.kill_ffmpeg()
 
