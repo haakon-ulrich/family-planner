@@ -93,7 +93,9 @@ async def _refresh_loop() -> None:
         if client is None:
             continue
         try:
-            await client.ensure_fresh_state(_device_name or settings.mammotion_device_name)
+            await client.ensure_fresh_state(
+                _device_name or settings.mammotion_device_name
+            )
         except Exception as exc:
             logger.warning("State refresh failed: %s", exc)
 
@@ -104,7 +106,7 @@ async def start() -> None:
     _http_session = aiohttp.ClientSession()
     # ha_version makes MammotionHTTP send App-Version: HA,2.X instead of
     # "ALIYUN DEMO,X" — the latter is blocked by the EU auth server.
-    _client = MammotionClient(ha_version="1.0.0")
+    _client = MammotionClient(ha_version="1.0.1")
 
     try:
         await _client.login_and_initiate_cloud(
