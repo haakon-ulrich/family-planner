@@ -41,6 +41,7 @@ export interface DashboardMember {
   name: string
   color: string // hex
   streak: number
+  isSkipped: boolean
   tasks: {
     morgen: DashboardTask[]
     nachmittag: DashboardTask[]

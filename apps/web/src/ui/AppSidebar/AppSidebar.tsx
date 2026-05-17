@@ -1,4 +1,4 @@
-import { LayoutDashboard, ListTodo, Music, Server, Settings, Users } from 'lucide-react';
+import { LayoutDashboard, ListTodo, Music, Plane, Server, Settings, Users } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import RobotVacuumIcon from '@web/ui/RobotVacuumIcon';
 
@@ -13,6 +13,7 @@ const TOP_NAV: NavItem[] = [
 const ADMIN_SUB_NAV: NavItem[] = [
   { to: '/admin/family', icon: <Users className="w-6 h-6" />, label: 'Familie' },
   { to: '/admin/tasks', icon: <ListTodo className="w-6 h-6" />, label: 'Aufgaben' },
+  { to: '/admin/holidays', icon: <Plane className="w-6 h-6" />, label: 'Urlaub' },
   { to: '/admin/system', icon: <Server className="w-6 h-6" />, label: 'System' },
 ];
 

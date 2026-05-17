@@ -115,6 +115,21 @@ export const taskStepInstances = sqliteTable(
 );
 
 // ---------------------------------------------------------------------------
+// skipped_day_ranges  (holiday / day-off ranges — tasks hidden, streak neutral)
+// ---------------------------------------------------------------------------
+
+export const skippedDayRanges = sqliteTable('skipped_day_ranges', {
+  id: text('id').primaryKey(),
+  /** null = applies to the whole household; set = applies to one member only */
+  memberId: text('member_id').references(() => familyMembers.id, { onDelete: 'cascade' }),
+  /** YYYY-MM-DD inclusive */
+  startDate: text('start_date').notNull(),
+  /** YYYY-MM-DD inclusive */
+  endDate: text('end_date').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+// ---------------------------------------------------------------------------
 // streaks  (written by the nightly rollover job)
 // ---------------------------------------------------------------------------
 
@@ -128,6 +143,8 @@ export const streaks = sqliteTable(
     date: text('date').notNull(),
     /** 1 if every applicable task for this member was completed */
     allCompleted: integer('all_completed').notNull().default(0),
+    /** 1 if this day was inside a skipped_day_range — neutral, doesn't break or advance streak */
+    skipped: integer('skipped').notNull().default(0),
   },
   (t) => [uniqueIndex('streaks_member_date_idx').on(t.memberId, t.date)],
 );
@@ -141,6 +158,8 @@ export const householdStreaks = sqliteTable('household_streaks', {
   date: text('date').primaryKey(),
   /** 1 if every member completed all their tasks */
   allCompleted: integer('all_completed').notNull().default(0),
+  /** 1 if the whole household had this day in a skipped_day_range */
+  skipped: integer('skipped').notNull().default(0),
 });
 
 // ---------------------------------------------------------------------------

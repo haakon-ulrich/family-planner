@@ -7,6 +7,7 @@ import { db } from '@server/db/index';
 import { settings as settingsTable, familyMembers, tasks, taskInstances } from '@server/db/schema';
 import { isTaskActiveOnDate } from '@server/lib/recurrence';
 import { updateStreakForMember, updateHouseholdStreak } from '@server/lib/streak';
+import { isDaySkippedForMember } from '@server/lib/skipped-days';
 import { broadcast } from '@server/sse';
 import { log } from '@server/logger';
 
@@ -53,6 +54,12 @@ const processCarryOvers = (completedDate: string, newDate: string): void => {
       .get();
 
     if (instance?.status === 'completed') continue;
+
+    // Don't carry over to a day that's skipped for this task's member (or household-wide).
+    const skipNewDay = task.memberId
+      ? isDaySkippedForMember(newDate, task.memberId)
+      : false;
+    if (skipNewDay) continue;
 
     // Mark the completed date as carried_over
     if (instance) {

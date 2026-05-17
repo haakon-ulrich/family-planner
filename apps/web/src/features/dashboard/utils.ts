@@ -1,4 +1,4 @@
-import type { FamilyMember, Task, TaskInstance, TaskStepInstance, TaskStatus } from '@shared/index';
+import type { FamilyMember, Task, TaskInstance, TaskStepInstance, TaskStatus, SkippedDayRange } from '@shared/index';
 import type { DashboardMember, DashboardTask } from './types';
 import { isTaskScheduledOn } from './lib/recurrence';
 
@@ -8,6 +8,11 @@ const BUCKET_MAP: Record<string, keyof DashboardMember['tasks']> = {
   evening: 'abend',
 };
 
+const isMemberSkippedOnDate = (memberId: string, date: string, ranges: SkippedDayRange[]): boolean =>
+  ranges.some(
+    (r) => (r.memberId === null || r.memberId === memberId) && r.startDate <= date && r.endDate >= date,
+  );
+
 export const buildDashboardMembers = (
   members: FamilyMember[],
   tasks: Task[],
@@ -15,6 +20,7 @@ export const buildDashboardMembers = (
   stepInstances: TaskStepInstance[],
   date: string,
   streakByMemberId: Map<string, number> = new Map(),
+  skippedDayRanges: SkippedDayRange[] = [],
 ): DashboardMember[] => {
   const instanceByTaskId = new Map(instances.map((i) => [i.taskId, i.status as TaskStatus]));
   const stepInstanceByStepId = new Map(stepInstances.map((s) => [s.taskStepId, s.status as TaskStatus]));
@@ -75,6 +81,7 @@ export const buildDashboardMembers = (
       name: member.name,
       color: member.color,
       streak: streakByMemberId.get(member.id) ?? 0,
+      isSkipped: isMemberSkippedOnDate(member.id, date, skippedDayRanges),
       tasks: buckets,
     };
   });

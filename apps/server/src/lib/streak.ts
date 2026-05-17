@@ -10,6 +10,7 @@ import {
   familyMembers,
 } from '@server/db/schema';
 import { isTaskActiveOnDate } from '@server/lib/recurrence';
+import { isDaySkippedForMember, isDaySkippedForHousehold } from '@server/lib/skipped-days';
 
 // ---------------------------------------------------------------------------
 // Per-task completion check
@@ -110,15 +111,26 @@ export const updateStreakForMember = (memberId: string, date: string): void => {
 
   const allApplicable = [...applicable, ...postponedTasks];
 
+  if (isDaySkippedForMember(date, memberId)) {
+    db.insert(streaks)
+      .values({ memberId, date, allCompleted: 0, skipped: 1 })
+      .onConflictDoUpdate({
+        target: [streaks.memberId, streaks.date],
+        set: { allCompleted: 0, skipped: 1 },
+      })
+      .run();
+    return;
+  }
+
   // A day with no applicable tasks counts as completed — no tasks means nothing to fail.
   const allDone =
     allApplicable.length === 0 || allApplicable.every((t) => isTaskCompletedOnDate(t, date));
 
   db.insert(streaks)
-    .values({ memberId, date, allCompleted: allDone ? 1 : 0 })
+    .values({ memberId, date, allCompleted: allDone ? 1 : 0, skipped: 0 })
     .onConflictDoUpdate({
       target: [streaks.memberId, streaks.date],
-      set: { allCompleted: allDone ? 1 : 0 },
+      set: { allCompleted: allDone ? 1 : 0, skipped: 0 },
     })
     .run();
 };
@@ -138,14 +150,25 @@ export const updateHouseholdStreak = (date: string): void => {
     .where(and(inArray(streaks.memberId, memberIds), eq(streaks.date, date)))
     .all();
 
+  if (isDaySkippedForHousehold(date)) {
+    db.insert(householdStreaks)
+      .values({ date, allCompleted: 0, skipped: 1 })
+      .onConflictDoUpdate({
+        target: householdStreaks.date,
+        set: { allCompleted: 0, skipped: 1 },
+      })
+      .run();
+    return;
+  }
+
   // A member with no streak row for the date had no tasks — treat as completed.
   const allDone = memberStreaks.every((s) => s.allCompleted === 1);
 
   db.insert(householdStreaks)
-    .values({ date, allCompleted: allDone ? 1 : 0 })
+    .values({ date, allCompleted: allDone ? 1 : 0, skipped: 0 })
     .onConflictDoUpdate({
       target: householdStreaks.date,
-      set: { allCompleted: allDone ? 1 : 0 },
+      set: { allCompleted: allDone ? 1 : 0, skipped: 0 },
     })
     .run();
 };

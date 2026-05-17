@@ -168,6 +168,27 @@ export const UpsertTaskStepInstanceSchema = z.object({
 export type UpsertTaskStepInstance = z.infer<typeof UpsertTaskStepInstanceSchema>;
 
 // ---------------------------------------------------------------------------
+// Skipped day ranges
+// ---------------------------------------------------------------------------
+
+export const SkippedDayRangeSchema = z.object({
+  id: z.uuid(),
+  /** null = whole household */
+  memberId: z.uuid().nullable(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  createdAt: z.string(),
+});
+export type SkippedDayRange = z.infer<typeof SkippedDayRangeSchema>;
+
+export const CreateSkippedDayRangeSchema = z.object({
+  memberId: z.uuid().nullable(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+}).refine((d) => d.startDate <= d.endDate, { message: 'startDate must be ≤ endDate' });
+export type CreateSkippedDayRange = z.infer<typeof CreateSkippedDayRangeSchema>;
+
+// ---------------------------------------------------------------------------
 // Streaks
 // ---------------------------------------------------------------------------
 
@@ -175,12 +196,14 @@ export const StreakSchema = z.object({
   memberId: z.uuid(),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   allCompleted: z.boolean(),
+  skipped: z.boolean(),
 });
 export type Streak = z.infer<typeof StreakSchema>;
 
 export const HouseholdStreakSchema = z.object({
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   allCompleted: z.boolean(),
+  skipped: z.boolean(),
 });
 export type HouseholdStreak = z.infer<typeof HouseholdStreakSchema>;
 
@@ -254,5 +277,6 @@ export const SseEventSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('day-rolled-over'), payload: z.object({ date: z.string() }) }),
   z.object({ type: z.literal('settings-changed'), payload: z.object({}) }),
   z.object({ type: z.literal('vacuum-state-changed'), payload: z.object({ state: z.string(), battery: z.number().nullable() }) }),
+  z.object({ type: z.literal('skipped-day-changed'), payload: z.object({}) }),
 ]);
 export type SseEvent = z.infer<typeof SseEventSchema>;

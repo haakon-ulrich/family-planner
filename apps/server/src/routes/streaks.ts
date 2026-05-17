@@ -6,23 +6,25 @@ import { streaks, householdStreaks } from '@server/db/schema';
 
 const app = new Hono();
 
-const toApiStreak = (row: { allCompleted: number; [k: string]: unknown }) => ({
+const toApiStreak = (row: { allCompleted: number; skipped: number; [k: string]: unknown }) => ({
   ...row,
   allCompleted: row.allCompleted === 1,
+  skipped: row.skipped === 1,
 });
 
-// If today's row exists but is not yet fully complete, skip it — the streak
-// from yesterday is still continuable and should remain visible.
+// Skipped days are transparent: they neither advance nor break a streak.
+// Today's row is ignored if not yet complete (streak from yesterday stays visible).
 const computeCurrentStreak = (
-  rows: Array<{ date: string; allCompleted: number }>,
+  rows: Array<{ date: string; allCompleted: number; skipped: number }>,
   today: string,
 ): number => {
   let start = 0;
-  if (rows.length > 0 && rows[0].date === today && rows[0].allCompleted !== 1) {
+  if (rows.length > 0 && rows[0].date === today && rows[0].allCompleted !== 1 && rows[0].skipped !== 1) {
     start = 1;
   }
   let count = 0;
   for (let i = start; i < rows.length; i++) {
+    if (rows[i].skipped === 1) continue; // transparent — don't break, don't count
     if (rows[i].allCompleted !== 1) break;
     count++;
   }

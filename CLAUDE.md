@@ -33,8 +33,6 @@ family-planner/
 
 ## Dev commands
 
-(These are the intended commands; wire them up as the project is scaffolded.)
-
 ```
 npm install                       # install all workspace deps
 npm run dev                       # run web + server concurrently
@@ -46,8 +44,15 @@ npm run lint                      # eslint
 npm run test                      # vitest
 npm run test --workspace=apps/server -- recurrence  # single test file
 npm run db:generate               # drizzle-kit generate (new migration)
-npm run db:migrate                # apply migrations
+npm run db:migrate                # apply migrations (also runs automatically at startup)
 ```
+
+### Adding a DB migration
+
+1. Edit `apps/server/src/db/schema.ts`.
+2. Run `npm run db:generate` — Drizzle Kit diffs the schema and writes a new `.sql` file in `apps/server/drizzle/`.
+3. Review the generated SQL before committing.
+4. Migrations apply automatically when the server starts (via `migrate(db, { migrationsFolder })` in `index.ts`). `npm run db:migrate` is a manual one-shot alternative.
 
 ## Environment variables
 
@@ -72,6 +77,14 @@ Production: DB lives at `/var/lib/family-planner/app.db`; `.env` at `/etc/family
 - Every handler validates its input through a Zod schema imported from `packages/shared` — the same schema the client form uses.
 - Any mutation that changes dashboard state must broadcast an SSE event after committing to the DB.
 
+### Adding a new API route
+
+Three files, always:
+
+1. Create `apps/server/src/routes/<name>.ts` — a `new Hono()` router, default-exported.
+2. Import it in `apps/server/src/index.ts` and register: `app.route('/api/<name>', router)`.
+3. Add any new Zod schemas / types to `packages/shared/src/index.ts`.
+
 ### SSE events
 
 Endpoint: `GET /api/events`. Event shape: `{ type: string, payload: unknown }` in the `data:` field.
@@ -85,7 +98,15 @@ Endpoint: `GET /api/events`. Event shape: `{ type: string, payload: unknown }` i
 | `day-rolled-over` | `{ date }` | midnight rollover job completed |
 | `settings-changed` | *(none)* | settings updated |
 
-Clients invalidate TanStack Query caches on receipt. `EventSource` reconnects automatically.
+### Adding a new SSE event type
+
+Three files, always:
+
+1. Add the new discriminated-union member to `SseEvent` in `packages/shared/src/index.ts`.
+2. Call `broadcast({ type: '...', payload: ... })` in the route handler after the DB write.
+3. Handle the new `event.type` in `apps/web/src/hooks/useSseEvents.ts`, calling `qc.invalidateQueries()` with the appropriate key(s).
+
+**Reconnect behavior:** when `EventSource` reconnects after a drop, `useSseEvents` detects it was previously connected and calls `window.location.reload()`. This means a server restart pulls fresh JS automatically on all clients.
 
 ### TanStack Query key conventions
 
@@ -101,6 +122,8 @@ Keys are stable and hierarchical so SSE handlers can invalidate by prefix:
 ["streaks", memberId]
 ```
 
+Each feature exports a `<NAME>_KEY` constant from its `index.ts` (e.g. `INSTANCES_KEY`, `TASKS_KEY`). Import and use that constant in `useSseEvents.ts` rather than inlining the array literal.
+
 ## Database
 
 - SQLite, single file. Managed by Drizzle ORM. Migrations in `apps/server/drizzle/`, applied at server startup.
@@ -108,6 +131,24 @@ Keys are stable and hierarchical so SSE handlers can invalidate by prefix:
 - **Timestamps:** ISO-8601 UTC strings in the DB. Convert to local time at the rendering edge only.
 - **Dates (no time):** `YYYY-MM-DD` strings. Never `Date` objects.
 - **IDs:** UUIDs (text), generated server-side.
+
+### The 3am date boundary
+
+The rollover job runs at 03:00. Between midnight and 03:00 the app treats the previous calendar day as "today" — tasks for that day are still completable. Both sides enforce this:
+
+- **Frontend:** `getTodayString()` in `apps/web/src/features/dashboard/utils.ts` — returns yesterday if `hours < 3`.
+- **Server:** `localToday()` in `apps/server/src/routes/instances.ts` — same logic via `localTimeMinutes()`.
+
+**Any code that needs "what day is it right now for the purposes of task completion" must use these helpers, not bare `new Date()`.** Getting this wrong causes the server to reject valid completions with `DATE_LOCKED` while the UI shows them as successful, resulting in silent rollback.
+
+### Streak writes
+
+`updateStreakForMember` / `updateHouseholdStreak` (in `apps/server/src/lib/streak.ts`) are called in two places:
+
+- **Route handlers** (`/api/instances`, `/api/step-instances`) — on every tick-off, to keep streaks current during the day.
+- **Rollover job** (`apps/server/src/jobs/rollover.ts`) — at 03:00, as the authoritative nightly write.
+
+The rollover write is the one that locks in the streak for a completed day; the real-time writes are best-effort live estimates.
 
 ## Conventions
 

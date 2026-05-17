@@ -1,7 +1,7 @@
 import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom'
 import AppLayout from '@web/ui/AppLayout'
 import { Dashboard } from '@web/features/dashboard'
-import { Admin, Family, Tasks, System } from '@web/features/admin'
+import { Admin, Family, Tasks, System, Holidays } from '@web/features/admin'
 import { VacuumPage } from '@web/features/vacuum'
 import { MediaPage } from '@web/features/media'
 import useSseEvents from '@web/hooks/useSseEvents'
@@ -23,6 +23,7 @@ const router = createBrowserRouter([
           { index: true, element: <Navigate to="/admin/family" replace /> },
           { path: 'family', element: <Family /> },
           { path: 'tasks', element: <Tasks /> },
+          { path: 'holidays', element: <Holidays /> },
           { path: 'system', element: <System /> },
         ],
       },

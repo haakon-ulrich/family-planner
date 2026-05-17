@@ -38,6 +38,20 @@ const MemberAvatar = ({ member }: MemberAvatarProps) => {
     prevCompleteRef.current = isComplete;
   }, [isComplete, date, animate, scope]);
 
+  if (member.isSkipped) {
+    return (
+      <div className="relative w-24 h-24 flex items-center justify-center">
+        <ProgressRing size={96} color={member.color} progress={0} complete={false} />
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center"
+          style={{ backgroundColor: `${member.color}20` }}
+        >
+          <span className="text-3xl">✈️</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div ref={scope} className="relative w-24 h-24 flex items-center justify-center">
       {burstKey > 0 && <CompletionBurst key={burstKey} color={member.color} />}

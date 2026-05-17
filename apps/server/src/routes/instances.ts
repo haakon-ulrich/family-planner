@@ -16,11 +16,16 @@ const getTimezone = (): string => {
   return row?.timezone ?? 'Europe/Vienna';
 };
 
-const localToday = (tz: string): string => formatInTimeZone(new Date(), tz, 'yyyy-MM-dd');
-
 const localTimeMinutes = (tz: string): number => {
   const [h, m] = formatInTimeZone(new Date(), tz, 'HH:mm').split(':').map(Number);
   return h * 60 + m;
+};
+
+// Mirrors the frontend's getTodayString(): before 03:00 we're still in the previous day's window.
+const localToday = (tz: string): string => {
+  const minutesSinceMidnight = localTimeMinutes(tz);
+  const base = minutesSinceMidnight < 3 * 60 ? addDays(new Date(), -1) : new Date();
+  return formatInTimeZone(base, tz, 'yyyy-MM-dd');
 };
 
 app.get('/', (c) => {

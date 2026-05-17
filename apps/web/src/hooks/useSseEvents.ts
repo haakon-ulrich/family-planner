@@ -8,6 +8,7 @@ import { CALENDAR_KEY } from '@web/features/calendar';
 import { WEATHER_KEY } from '@web/features/weather';
 import { SETTINGS_KEY } from '@web/features/admin';
 import { VACUUM_STATUS_KEY } from '@web/features/vacuum';
+import { SKIPPED_DAYS_KEY } from '@web/features/skipped-days';
 
 const STREAKS_KEY = ['streaks'];
 
@@ -65,6 +66,9 @@ const useSseEvents = () => {
           break;
         case 'vacuum-state-changed':
           qc.invalidateQueries({ queryKey: VACUUM_STATUS_KEY });
+          break;
+        case 'skipped-day-changed':
+          qc.invalidateQueries({ queryKey: SKIPPED_DAYS_KEY });
           break;
       }
     });

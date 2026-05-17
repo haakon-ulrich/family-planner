@@ -19,6 +19,7 @@ const BucketRow = ({ icon, label, members, bucket }: BucketRowProps) => (
         memberId={member.id}
         memberColor={member.color}
         hasBorderRight={i < members.length - 1}
+        isSkipped={member.isSkipped}
       />
     ))}
   </div>

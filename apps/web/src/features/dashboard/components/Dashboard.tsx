@@ -10,6 +10,7 @@ import { useMembers } from '@web/features/members';
 import { useTasks } from '@web/features/tasks';
 import { useInstances, useStepInstances } from '@web/features/instances';
 import { useMemberStreaks } from '@web/features/streaks';
+import { useSkippedDayRanges } from '@web/features/skipped-days';
 import { buildDashboardMembers, getTodayString } from '../utils';
 import { DashboardDateProvider } from '../DashboardDate';
 import type { DashboardMember } from '../types';
@@ -40,8 +41,9 @@ const Dashboard = () => {
   const { data: instances = [] } = useInstances(date);
   const { data: stepInstances = [] } = useStepInstances(date);
   const streaks = useMemberStreaks(apiMembers.map((m) => m.id));
+  const { data: skippedRanges = [] } = useSkippedDayRanges();
 
-  const members = buildDashboardMembers(apiMembers, tasks, instances, stepInstances, date, streaks);
+  const members = buildDashboardMembers(apiMembers, tasks, instances, stepInstances, date, streaks, skippedRanges);
 
   return (
     <DashboardDateProvider date={date}>
